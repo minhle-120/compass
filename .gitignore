@@ -1,0 +1,28 @@
+# Node dependencies
+node_modules/
+
+# Local database file
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.db
+*.db-journal
+*.db-wal
+
+# Environment variables
+.env
+
+# Agent conversation logs and dynamic cache/history
+src/data/history/
+src/data/history/*.json
+data/
+logs/
+
+# IDEs and OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
