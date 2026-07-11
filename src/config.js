@@ -2,20 +2,31 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 export const config = {
+  // Server & Queue Database Configuration
   port: parseInt(process.env.PORT || '3000', 10),
-  openaiApiKey: process.env.OPENAI_API_KEY,
   dbPath: process.env.DB_PATH || './database.sqlite',
   concurrencyCap: 5,
   pollIntervalMs: 3000,
-  contextTokenBudget: 60000,
-  openaiModel: 'gpt-4o',
+
+  // Storage Paths
   historyDir: './src/data/history',
+
+  // LLM Orchestration Settings
   llmProvider: process.env.LLM_PROVIDER || 'openai',
+  contextTokenBudget: 60000,
+
+  // OpenAI Cloud API Configuration
+  openaiApiKey: process.env.OPENAI_API_KEY,
+  openaiModel: 'gpt-4o',
+  openaiTimeoutMs: 45000,
+
+  // Llama.cpp Local API Configuration
   llamacppUrl: process.env.LLAMACPP_URL || 'http://localhost:8080',
   llamacppModel: process.env.LLAMACPP_MODEL || 'local-model',
-  openaiTimeoutMs: 45000,
   llamacppTimeoutMs: 120000,
-  workerTimeoutMs: 300000, // 5 minutes watchdog timeout
+
+  // Worker Thread Watchdogs & Safety Budgets
+  workerTimeoutMs: 300000, // 5-minute execution watchdog timeout
 
   // Game Support Agent System Instructions
   systemPrompt: `
@@ -38,3 +49,4 @@ Validation of your idle call depends dynamically on your selected "resolution_ty
 - "rejected": Blank, spam, off-topic, or invalid ticket. Requires only: read_ticket.
   `.trim()
 };
+
