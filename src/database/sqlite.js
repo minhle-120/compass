@@ -47,56 +47,8 @@ export function initDb() {
       draft_response TEXT,
       error_message TEXT
     );
-
-    CREATE TABLE IF NOT EXISTS incidents (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      status TEXT NOT NULL,
-      severity TEXT NOT NULL,
-      started_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      platforms TEXT, /* JSON array of strings */
-      regions TEXT, /* JSON array of strings */
-      services TEXT, /* JSON array of strings */
-      symptoms TEXT NOT NULL,
-      summary TEXT NOT NULL,
-      impact TEXT,
-      understanding TEXT,
-      guidance TEXT,
-      workaround TEXT,
-      resolution TEXT,
-      approved_message TEXT
-    );
-
-    CREATE TABLE IF NOT EXISTS kb_articles (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      status TEXT NOT NULL,
-      platforms TEXT, /* JSON array of strings */
-      game_versions TEXT,
-      updated_at TEXT NOT NULL,
-      summary TEXT NOT NULL,
-      excerpt TEXT NOT NULL,
-      content TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS slang_terms (
-      term TEXT PRIMARY KEY,
-      canonical_form TEXT,
-      language TEXT,
-      meaning TEXT NOT NULL,
-      common_uses TEXT, /* JSON array of strings */
-      interpretation_notes TEXT,
-      related_terms TEXT /* JSON array of strings */
-    );
-    
-    CREATE TABLE IF NOT EXISTS unknown_slang (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      term TEXT NOT NULL,
-      context TEXT NOT NULL,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP
-    );
   `);
+
 
   logger.info(`SQLite database initialized at ${dbPath}`);
   return db;
