@@ -13,6 +13,54 @@
   --mono: "Cascadia Mono", "Lucida Console", monospace;
 }
 
+:root[data-theme="dark"] {
+  --paper: #0f1c1f;
+  --paper-bright: #17282b;
+  --ink: #dbe3e2;
+  --ink-soft: #8ca3a6;
+  --line: #2e4a4e;
+  --signal: #ff7051;
+  --signal-dark: #e04a2c;
+  --aqua: #3fa096;
+  --danger: #ff6050;
+}
+
+:root[data-theme="dark"] body {
+  background-image:
+    linear-gradient(rgba(219, 227, 226, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(219, 227, 226, 0.02) 1px, transparent 1px);
+}
+
+:root[data-theme="dark"] .catalog {
+  background: rgba(15, 28, 31, 0.92);
+}
+
+:root[data-theme="dark"] .workspace {
+  background: rgba(23, 40, 43, 0.78);
+}
+
+:root[data-theme="dark"] .entry-item:hover, 
+:root[data-theme="dark"] .entry-item.active {
+  background: #255d57;
+}
+
+:root[data-theme="dark"] .stat-chip,
+:root[data-theme="dark"] .origin-badge {
+  background: #255d57;
+  color: var(--paper-bright);
+}
+
+:root[data-theme="dark"] .origin-badge.origin-muted {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--ink-soft);
+}
+
+:root[data-theme="dark"] .editor-state input:focus, 
+:root[data-theme="dark"] .editor-state textarea:focus {
+  box-shadow: 5px 5px 0 #255d57;
+}
+
 *, *::before, *::after { box-sizing: border-box; }
 
 html { min-height: 100%; }

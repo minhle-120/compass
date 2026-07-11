@@ -30,6 +30,40 @@
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 }
 
+:root[data-theme="dark"] {
+  --color-bg: #0d1117;
+  --color-bg-subtle: #161b22;
+  --color-bg-inset: #010409;
+  --color-border: #30363d;
+  --color-border-subtle: #21262d;
+  --color-text: #e6edf3;
+  --color-text-secondary: #8d96a0;
+  --color-text-muted: #6e7681;
+  --color-link: #2f81f7;
+  --color-success: #3fb950;
+  --color-success-bg: rgba(46,160,67,0.15);
+  --color-warning: #d29922;
+  --color-warning-bg: rgba(187,128,9,0.15);
+  --color-danger: #f85149;
+  --color-danger-bg: rgba(248,81,73,0.15);
+  --color-info: #2f81f7;
+  --color-info-bg: rgba(56,139,253,0.15);
+  --color-purple: #bc8cff;
+  --color-purple-bg: rgba(188,140,255,0.15);
+  --color-btn-primary: #238636;
+  --color-btn-primary-hover: #2ea043;
+  --shadow-sm: 0 1px 0 rgba(0,0,0,0.4);
+  --shadow-md: 0 3px 6px rgba(0,0,0,0.5);
+}
+
+:root[data-theme="dark"] .header-nav a:hover {
+  background: rgba(255,255,255,0.08);
+}
+
+:root[data-theme="dark"] .header-nav a.active {
+  background: rgba(255,255,255,0.15);
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;

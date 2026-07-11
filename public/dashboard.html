@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard — Compass</title>
   <link rel="stylesheet" href="/css/styles.css">
+  <script src="/js/theme.js"></script>
 </head>
 <body>
   <header class="header">
@@ -17,7 +18,12 @@
         <a href="/wiki">Wiki</a>
       </nav>
     </div>
-    <span id="poll-indicator" class="text-sm text-muted">Live — polling every 3s</span>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <span id="poll-indicator" class="text-sm text-muted">Live — polling every 3s</span>
+      <button id="theme-toggle" class="btn btn-sm" aria-label="Toggle theme" style="padding: 4px 8px; line-height: 1;">
+        <span class="theme-toggle-icon">🌙</span>
+      </button>
+    </div>
   </header>
 
   <main class="container-wide">
