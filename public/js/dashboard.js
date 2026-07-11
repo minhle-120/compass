@@ -156,11 +156,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const fields = [
         ['ID', t.id], ['Subject', t.subject], ['Status', t.status],
         ['Description', t.description],
-        ['Requester', t.requester_id], ['Account', t.account_id],
-        ['Platform', t.platform], ['Region', t.region],
-        ['Device', t.device], ['Game Version', t.game_version],
-        ['Locale', t.locale],
-        ['Transaction', t.transaction_id], ['Product', t.product], ['Amount', t.amount],
         ['Categories', Array.isArray(t.categories) ? t.categories.join(', ') : t.categories],
         ['Severity', t.severity], ['Rationale', t.rationale],
         ['Routing', t.routing_destination], ['Routing Reason', t.routing_reason],

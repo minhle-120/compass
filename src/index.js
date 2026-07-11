@@ -7,6 +7,7 @@ import { readFileSync, existsSync } from 'fs';
 import { config } from './config.js';
 import { logger } from './utils/logger.js';
 import { isValidTicketId } from './utils/ticketId.js';
+import { normalizeTicketSubmission } from './utils/ticketSubmission.js';
 import { initDb, resetInterruptedTickets, getTicket, insertTicket, getDb, getQueueStats, appendTicketMessage } from './database/sqlite.js';
 import { pool } from './worker/pool.js';
 
@@ -148,25 +149,7 @@ app.post('/api/tickets/:id/messages', (req, res) => {
 // API Endpoint to submit a new ticket
 app.post('/api/tickets', (req, res) => {
   try {
-    const ticketData = req.body;
-    
-    // Auto-generate ticket ID if not provided
-    if (!ticketData.id || typeof ticketData.id !== 'string' || !ticketData.id.trim()) {
-      ticketData.id = `T-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
-    }
-    if (!isValidTicketId(ticketData.id)) {
-      return res.status(400).json({ error: 'Ticket ID may contain only letters, numbers, underscores, and hyphens' });
-    }
-    if (!ticketData.subject || typeof ticketData.subject !== 'string' || !ticketData.subject.trim()) {
-      return res.status(400).json({ error: 'A valid string Ticket Subject is required' });
-    }
-    if (!ticketData.description || typeof ticketData.description !== 'string' || !ticketData.description.trim()) {
-      return res.status(400).json({ error: 'A valid string Ticket Description is required' });
-    }
-
-    // Default status is pending
-    ticketData.status = 'pending';
-    
+    const ticketData = normalizeTicketSubmission(req.body);
     insertTicket(ticketData);
     logger.info(`Queued ticket ${ticketData.id} via API`, 'ExpressAPI');
     
@@ -175,6 +158,9 @@ app.post('/api/tickets', (req, res) => {
 
     res.status(201).json({ message: 'Ticket queued successfully', ticketId: ticketData.id });
   } catch (err) {
+    if (err instanceof TypeError) {
+      return res.status(400).json({ error: err.message });
+    }
     logger.error('Failed to insert and queue new ticket', 'ExpressAPI', err);
     res.status(500).json({ error: 'Failed to queue ticket' });
   }
