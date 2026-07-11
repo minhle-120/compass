@@ -44,16 +44,15 @@ describe('support workflow tools', () => {
   });
 
   it('reads the actual assigned ticket instead of returning a stub', async () => {
-    const result = JSON.parse(await readTicket({}, context));
-    expect(result.ticket).toEqual(expect.objectContaining({
+    const result = await readTicket({}, context);
+    expect(result).toEqual(expect.objectContaining({
       id: 'T-ANDROID',
-      platform: 'Android',
       description: expect.stringContaining('crashes on startup')
     }));
   });
 
   it('uses an incident match to prevent severity under-classification', async () => {
-    const search = JSON.parse(await searchIncidents({ query: 'android crash startup update' }, context));
+    const search = await searchIncidents({ query: 'android crash startup update' }, context);
     expect(search.incidents[0].id).toBe('INC-004');
 
     const classification = JSON.parse(await classifyTicket({
@@ -82,10 +81,10 @@ describe('support workflow tools', () => {
   });
 
   it('searches and retrieves real knowledge-base records', async () => {
-    const search = JSON.parse(await searchKnowledgeBase({ query: 'Android startup crash' }, context));
-    expect(search.articles[0].id).toBe('KB-001');
+    const search = await searchKnowledgeBase({ query: 'Android startup crash' }, context);
+    expect(search.results[0].article_id).toBe('KB-001');
 
-    const details = JSON.parse(await getKnowledgeBaseArticle({ article_id: 'kb-001' }, context));
-    expect(details.article.content).toContain('clear the cache');
+    const details = await getKnowledgeBaseArticle({ article_id: 'kb-001' }, context);
+    expect(details.content).toContain('clear the cache');
   });
 });

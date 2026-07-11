@@ -22,9 +22,9 @@ export const schema = {
 export async function handler(args, sessionContext) {
   const response = typeof args?.response === 'string' ? args.response.trim() : '';
   if (!response) {
-    throw new TypeError('response must be a non-empty string');
+    throw new TypeError('A drafted response is required');
   }
 
   updateTicketDraft(sessionContext.ticketId, response);
-  return JSON.stringify({ response });
+  return 'Draft response saved successfully.';
 }

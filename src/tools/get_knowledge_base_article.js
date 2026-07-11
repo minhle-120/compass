@@ -1,5 +1,6 @@
 // src/tools/get_knowledge_base_article.js
-import { getKnowledgeBaseArticle } from '../database/sqlite.js';
+import { getDb, getKnowledgeBaseArticle } from '../database/sqlite.js';
+import { getReferenceKnowledge } from '../../services/kb/kbService.js';
 
 export const schema = {
   type: 'function',
@@ -25,9 +26,16 @@ export async function handler(args, sessionContext) {
     throw new TypeError('article_id must be a non-empty string');
   }
 
+  const database = getDb();
+  const reference = getReferenceKnowledge(database, articleId);
+  if (reference) return reference;
+
   const article = getKnowledgeBaseArticle(articleId);
-  if (!article) {
-    return JSON.stringify({ error: `Knowledge base article "${articleId}" not found`, article: null });
-  }
-  return JSON.stringify({ article });
+  if (!article) return { found: false, article_id: articleId };
+  return {
+    found: true,
+    article_id: article.id,
+    source: 'knowledge_base_article',
+    ...article
+  };
 }

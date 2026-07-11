@@ -16,7 +16,12 @@ export const schema = {
 export async function handler(args, sessionContext) {
   const ticket = getTicket(sessionContext?.ticketId);
   if (!ticket) {
-    return JSON.stringify({ error: `Ticket "${sessionContext?.ticketId}" not found`, ticket: null });
+    throw new Error(`Ticket "${sessionContext?.ticketId}" not found in database.`);
   }
-  return JSON.stringify({ ticket });
+  return {
+    id: ticket.id,
+    subject: ticket.subject,
+    description: ticket.description,
+    conversation: ticket.conversation || []
+  };
 }
