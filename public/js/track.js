@@ -129,20 +129,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     fullMessages.forEach(msg => {
       const isAgent = msg.sender !== 'player';
-      const itemClass = isAgent ? 'timeline-item agent' : 'timeline-item';
+      const itemClass = isAgent ? 'ticket-timeline-item agent' : 'ticket-timeline-item';
       const avatarText = isAgent ? 'SR' : 'ME';
       const senderName = isAgent ? 'Support Assistant (AI)' : 'You (Player)';
       const dateText = new Date(msg.timestamp).toLocaleString();
 
       const itemHtml = `
         <div class="${itemClass}">
-          <div class="timeline-avatar">${avatarText}</div>
-          <div class="timeline-content">
-            <div class="timeline-header">
+          <div class="ticket-timeline-avatar">${avatarText}</div>
+          <div class="ticket-timeline-content">
+            <div class="ticket-timeline-header">
               <strong>${senderName}</strong>
               <span>${dateText}</span>
             </div>
-            <div class="timeline-body">${escapeHTML(msg.message)}</div>
+            <div class="ticket-timeline-body">${escapeHTML(msg.message)}</div>
           </div>
         </div>
       `;

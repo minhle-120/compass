@@ -6,11 +6,11 @@
   <title>Track Ticket — Compass</title>
   <link rel="stylesheet" href="/css/styles.css">
   <style>
-    .timeline {
+    .ticket-timeline {
       margin-top: 24px;
       position: relative;
     }
-    .timeline::before {
+    .ticket-timeline::before {
       content: "";
       position: absolute;
       top: 0;
@@ -20,13 +20,13 @@
       background-color: var(--color-border);
       z-index: 1;
     }
-    .timeline-item {
+    .ticket-timeline-item {
       display: flex;
       margin-bottom: 24px;
       position: relative;
       z-index: 2;
     }
-    .timeline-avatar {
+    .ticket-timeline-avatar {
       width: 40px;
       height: 40px;
       border-radius: 50%;
@@ -41,14 +41,14 @@
       font-size: 14px;
       color: var(--color-fg-muted);
     }
-    .timeline-content {
+    .ticket-timeline-content {
       flex-grow: 1;
       border: 1px solid var(--color-border);
       border-radius: 6px;
       background-color: var(--color-bg);
       overflow: hidden;
     }
-    .timeline-header {
+    .ticket-timeline-header {
       background-color: var(--color-bg-subtle);
       padding: 8px 16px;
       border-bottom: 1px solid var(--color-border);
@@ -57,21 +57,21 @@
       justify-content: space-between;
       color: var(--color-fg-muted);
     }
-    .timeline-body {
+    .ticket-timeline-body {
       padding: 16px;
       font-size: 14px;
       line-height: 1.6;
       white-space: pre-wrap;
     }
-    .timeline-item.agent .timeline-avatar {
+    .ticket-timeline-item.agent .ticket-timeline-avatar {
       background-color: #2da44e;
       color: #ffffff;
       border-color: #2da44e;
     }
-    .timeline-item.agent .timeline-content {
+    .ticket-timeline-item.agent .ticket-timeline-content {
       border-color: rgba(45, 164, 78, 0.4);
     }
-    .timeline-item.agent .timeline-header {
+    .ticket-timeline-item.agent .ticket-timeline-header {
       background-color: rgba(45, 164, 78, 0.05);
       border-bottom-color: rgba(45, 164, 78, 0.2);
     }
@@ -149,7 +149,7 @@
         </div>
       </div>
 
-      <div class="timeline" id="conversation-timeline">
+      <div class="ticket-timeline" id="conversation-timeline">
         <!-- Message items dynamically populated -->
       </div>
 
