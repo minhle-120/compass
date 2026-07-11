@@ -54,6 +54,7 @@ describe('WorkerPool Orchestrator', () => {
     pool.stop();
     pool.activeWorkers.clear();
     pool.activeWorkersMap.clear();
+    pool.workersByTicket.clear();
     pool.isChecking = false;
     _resetMockInstance();
 
@@ -222,5 +223,17 @@ describe('WorkerPool Orchestrator', () => {
     expect(duplicate).toBeNull();
     expect(pool.activeWorkers.size).toBe(1);
     expect(pool.activeWorkersMap.size).toBe(1);
+  });
+
+  it('should terminate and remove an active worker when its ticket is cancelled', async () => {
+    insertTicket({ id: 'T-CANCEL', status: 'pending' });
+    await pool.checkQueue();
+    const worker = _getMockInstance();
+
+    await expect(pool.cancelTicket('T-CANCEL')).resolves.toBe(true);
+    expect(worker.terminate).toHaveBeenCalledOnce();
+    expect(pool.activeWorkers.size).toBe(0);
+    expect(pool.activeWorkersMap.has('T-CANCEL')).toBe(false);
+    expect(pool.workersByTicket.has('T-CANCEL')).toBe(false);
   });
 });

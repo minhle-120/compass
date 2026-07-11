@@ -27,6 +27,7 @@ describe('Read Ticket Tool', () => {
       account_id: 'internal-account',
       platform: 'PC',
       region: 'Asia',
+      attachments: [],
       conversation: [{ sender: 'player', message: 'It happens every match.' }]
     };
     insertTicket(mockTicket);
@@ -40,6 +41,7 @@ describe('Read Ticket Tool', () => {
       description: 'The game is lagging.',
       platform: 'PC',
       region: 'Asia',
+      attachments: [],
       conversation: [{ sender: 'player', message: 'It happens every match.' }]
     });
     expect(result).not.toHaveProperty('status');
@@ -50,6 +52,7 @@ describe('Read Ticket Tool', () => {
   it('returns an empty conversation when the ticket has no updates', async () => {
     insertTicket({ id: 'T-NO-UPDATES', subject: 'Question', description: 'How?' });
     await expect(handler({}, { ticketId: 'T-NO-UPDATES' })).resolves.toMatchObject({
+      attachments: [],
       conversation: []
     });
   });

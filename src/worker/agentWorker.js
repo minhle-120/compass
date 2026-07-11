@@ -25,6 +25,7 @@ async function start() {
     unknownWordChecks: {},
     flags: {
       wasTicketRead: false,
+      wasAttachmentsInspected: false,
       wasClassified: false,
       wasResponseDrafted: false,
       wasIncidentsChecked: false,

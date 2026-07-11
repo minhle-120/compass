@@ -346,6 +346,25 @@ export function failRunningTicket(id, errorMessage) {
   return info.changes === 1;
 }
 
+export function closeTicketByUser(id) {
+  const now = new Date().toISOString();
+  const info = getDb().prepare(`
+    UPDATE tickets
+    SET status = 'completed', resolution_type = 'user_closed',
+        resolution_reason = 'Closed manually by the player',
+        draft_response = NULL, draft_status = NULL,
+        error_message = NULL, updated_at = ?
+    WHERE id = ? AND (
+      status IN ('pending', 'running', 'escalated')
+      OR (status = 'completed' AND (
+        resolution_type = 'needs_clarification'
+        OR draft_status = 'pending_review'
+      ))
+    )
+  `).run(now, id);
+  return info.changes === 1;
+}
+
 export function updateTicketClassification(id, categories, severity, rationale) {
   const database = getDb();
   const stmt = database.prepare(`

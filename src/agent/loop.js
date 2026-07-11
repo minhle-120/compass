@@ -14,6 +14,7 @@ import { parentPort, threadId } from 'worker_threads';
 
 const FLAG_BY_TOOL = {
   read_ticket: 'wasTicketRead',
+  inspect_ticket_attachments: 'wasAttachmentsInspected',
   classify_ticket: 'wasClassified',
   draft_response: 'wasResponseDrafted',
   search_incidents: 'wasIncidentsChecked',
@@ -107,6 +108,10 @@ function reconstructWorkflowFlags(messages, sessionContext) {
     const toolName = message.name || call?.name;
     const flag = FLAG_BY_TOOL[toolName];
     if (flag) sessionContext.flags[flag] = true;
+    if (toolName === 'read_ticket') {
+      sessionContext.hasAttachments = Array.isArray(result.output?.attachments)
+        && result.output.attachments.length > 0;
+    }
 
     if (toolName === 'query_slang_dictionary') {
       const key = normalizeUnknownWord(call?.args?.term);

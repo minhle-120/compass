@@ -94,6 +94,9 @@ export async function executeTool(name, args, sessionContext) {
     if (!sessionContext.flags.wasTicketRead) {
       missing.push('read_ticket');
     }
+    if (sessionContext.hasAttachments && !sessionContext.flags.wasAttachmentsInspected) {
+      missing.push('inspect_ticket_attachments');
+    }
 
     if (resolutionType === 'resolved') {
       if (!sessionContext.flags.wasIncidentsChecked) missing.push('search_incidents or get_incident_details');
@@ -139,6 +142,9 @@ export async function executeTool(name, args, sessionContext) {
     }
     if (name === 'read_ticket') {
       sessionContext.flags.wasTicketRead = true;
+      sessionContext.hasAttachments = Array.isArray(result.attachments) && result.attachments.length > 0;
+    } else if (name === 'inspect_ticket_attachments') {
+      sessionContext.flags.wasAttachmentsInspected = true;
     } else if (name === 'classify_ticket') {
       sessionContext.flags.wasClassified = true;
     } else if (name === 'draft_response') {

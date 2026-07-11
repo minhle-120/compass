@@ -11,10 +11,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const ticketResolution = document.getElementById('ticket-resolution');
   const ticketIdDisplay = document.getElementById('ticket-id-display');
   const ticketCreated = document.getElementById('ticket-created');
+  const closeTicketBtn = document.getElementById('close-ticket-btn');
   const deleteTicketBtn = document.getElementById('delete-ticket-btn');
   const timeline = document.getElementById('conversation-timeline');
   
   const replyForm = document.getElementById('reply-form');
+  const replyBox = document.getElementById('reply-box');
   const replyMessage = document.getElementById('reply-message');
   const replyBtn = document.getElementById('reply-btn');
 
@@ -68,6 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
           resolved:           '✓ Resolved',
           needs_clarification: '? Needs Clarification',
           escalated:          '↑ Escalated',
+          user_closed:        '✓ Closed by you',
           rejected:           '✗ Rejected'
         };
         ticketResolution.textContent = labelMap[ticket.resolution_type] || ticket.resolution_type;
@@ -79,6 +82,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const canDelete = ticket.status === 'completed' && ticket.resolution_type === 'resolved';
       deleteTicketBtn.style.display = canDelete ? 'inline-flex' : 'none';
+      closeTicketBtn.style.display = isOpen ? 'inline-flex' : 'none';
+      replyBox.style.display = isOpen ? 'block' : 'none';
 
       // Manage polling dynamically based on status
       const isActive = ['pending', 'running', 'awaiting_review'].includes(ticket.status);
@@ -117,7 +122,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const initialMsg = {
       sender: 'player',
       timestamp: ticket.created_at || new Date().toISOString(),
-      message: ticket.description || '(No description provided)'
+      message: ticket.description || '(No description provided)',
+      attachments: Array.isArray(ticket.attachments) ? ticket.attachments : []
     };
 
     // Combine original details and conversation thread
@@ -145,6 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const avatarText = isAgent ? 'SR' : 'ME';
       const senderName = isAgent ? 'Support Assistant (AI)' : 'You (Player)';
       const dateText = new Date(msg.timestamp).toLocaleString();
+      const attachmentsHtml = renderAttachments(msg.attachments);
 
       const itemHtml = `
         <div class="${itemClass}">
@@ -155,11 +162,46 @@ document.addEventListener('DOMContentLoaded', () => {
               <span>${dateText}</span>
             </div>
             <div class="ticket-timeline-body">${escapeHTML(msg.message)}</div>
+            ${attachmentsHtml}
           </div>
         </div>
       `;
       timeline.insertAdjacentHTML('beforeend', itemHtml);
     });
+
+    if (ticket.status === 'pending' || ticket.status === 'running') {
+      timeline.insertAdjacentHTML('beforeend', `
+        <div class="ticket-timeline-item agent ai-working" role="status" aria-live="polite">
+          <div class="ticket-timeline-avatar">AI</div>
+          <div class="ticket-timeline-content">
+            <div class="ai-working-body">
+              <span class="ai-working-spinner" aria-hidden="true"></span>
+              <span>Support Assistant is working on your ticket...</span>
+            </div>
+          </div>
+        </div>
+      `);
+    }
+  }
+
+  function renderAttachments(attachments) {
+    if (!Array.isArray(attachments)) return '';
+    const items = attachments.map((attachment) => {
+      const source = safeMediaDataUrl(attachment?.dataUrl, attachment?.type);
+      if (!source) return '';
+      const name = escapeHTML(attachment.name || 'Attachment');
+      const media = attachment.type.startsWith('image/')
+        ? `<img src="${source}" alt="Attached image: ${name}">`
+        : `<video src="${source}" controls preload="metadata" aria-label="Attached video: ${name}"></video>`;
+      return `<figure class="ticket-media-item">${media}<figcaption>${name}</figcaption></figure>`;
+    }).filter(Boolean);
+    return items.length ? `<div class="ticket-media-grid">${items.join('')}</div>` : '';
+  }
+
+  function safeMediaDataUrl(value, declaredType) {
+    if (typeof value !== 'string' || typeof declaredType !== 'string') return '';
+    const escapedType = declaredType.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`^data:${escapedType};base64,[A-Za-z0-9+/=]+$`, 'i').test(value) ? value : '';
   }
 
   function escapeHTML(str) {
@@ -221,6 +263,25 @@ document.addEventListener('DOMContentLoaded', () => {
       window.alert(error.message);
       deleteTicketBtn.disabled = false;
       deleteTicketBtn.textContent = 'Delete ticket';
+    }
+  });
+
+  closeTicketBtn.addEventListener('click', async () => {
+    const confirmed = window.confirm(`Close ticket ${ticketId}? Its conversation will remain available, but the AI will stop working on it.`);
+    if (!confirmed) return;
+
+    closeTicketBtn.disabled = true;
+    closeTicketBtn.textContent = 'Closing...';
+    try {
+      const res = await fetch(`/api/tickets/${encodeURIComponent(ticketId)}/close`, { method: 'POST' });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.error || 'Failed to close ticket.');
+      await fetchTicketDetails();
+    } catch (error) {
+      window.alert(error.message);
+    } finally {
+      closeTicketBtn.disabled = false;
+      closeTicketBtn.textContent = 'Close ticket';
     }
   });
 

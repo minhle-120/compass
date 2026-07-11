@@ -26,6 +26,7 @@ describe('tool registry outcomes', () => {
     expect(new Set(names).size).toBe(names.length);
     expect(names).toContain('idle');
     expect(names).toContain('read_ticket');
+    expect(names).toContain('inspect_ticket_attachments');
     expect(names).toContain('flag_unknown_word');
     expect(names).toContain('delete_resolved_ticket');
   });
@@ -65,6 +66,23 @@ describe('tool registry outcomes', () => {
     expect(result.terminal).toBe(false);
     expect(result.error.code).toBe('WORKFLOW_INCOMPLETE');
     expect(result.missingSteps).toContain('read_ticket');
+  });
+
+  it('requires media inspection before completing a ticket with attachments', async () => {
+    getDb().prepare('DELETE FROM tickets').run();
+    insertTicket({
+      id: 'T-REGISTRY',
+      subject: 'Visual issue',
+      description: 'See image',
+      attachments: [{ name: 'issue.png', type: 'image/png', size: 1 }]
+    });
+    const context = createSessionContext();
+
+    await executeTool('read_ticket', {}, context);
+    const result = await executeTool('idle', { resolution_type: 'rejected', reason: 'Invalid' }, context);
+
+    expect(result).toMatchObject({ ok: false, error: { code: 'WORKFLOW_INCOMPLETE' } });
+    expect(result.missingSteps).toContain('inspect_ticket_attachments');
   });
 
   it('returns a structured terminal result when idle validation succeeds', async () => {

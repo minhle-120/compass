@@ -19,6 +19,7 @@ import {
   finalizeTicket,
   appendTicketMessage,
   publishDraftResponse,
+  closeTicketByUser,
   migrateTicketSchema
 } from '../sqlite.js';
 
@@ -253,6 +254,26 @@ describe('SQLite Database Queue Layer', () => {
       error_message: null,
       resolution_type: 'resolved'
     });
+  });
+
+  it('allows a player to close an active ticket without deleting it', () => {
+    insertTicket({ id: 'T-USER-CLOSE', status: 'running' });
+
+    expect(closeTicketByUser('T-USER-CLOSE')).toBe(true);
+    expect(getTicket('T-USER-CLOSE')).toMatchObject({
+      status: 'completed',
+      resolution_type: 'user_closed',
+      resolution_reason: 'Closed manually by the player'
+    });
+    expect(closeTicketByUser('T-USER-CLOSE')).toBe(false);
+  });
+
+  it('lets a player close a ticket that was awaiting clarification', () => {
+    insertTicket({ id: 'T-CLOSE-CLARIFY', status: 'running' });
+    finalizeTicket('T-CLOSE-CLARIFY', 'completed', 'needs_clarification', 'Need logs');
+
+    expect(closeTicketByUser('T-CLOSE-CLARIFY')).toBe(true);
+    expect(getTicket('T-CLOSE-CLARIFY').resolution_type).toBe('user_closed');
   });
 
   it('should return null when appending a message to a missing ticket', () => {
