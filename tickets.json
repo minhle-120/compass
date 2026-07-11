@@ -1,0 +1,21 @@
+[
+  {
+    "id": "GAME-0001",
+    "title": "Getting kicks out of the games",
+    "description": "I got kicks out of the games with unknown reasons",
+    "ticket_type": "connection_issue",
+    "status": "open",
+    "metadata": {
+      "created_at": "2026-07-11T06:18:12.400766+00:00"
+    }
+  },
+  {
+    "id": "GAME-0002",
+    "title": "Crashing game",
+    "description": "i currently playing valorant and it suddenly crash and i cannot go back in",
+    "requester": "Cappy",
+    "ticket_type": "crash_or_freeze",
+    "status": "open",
+    "creation_time": "2026-07-11T07:34:46.801201+00:00"
+  }
+]
