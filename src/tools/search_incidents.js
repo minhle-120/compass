@@ -5,7 +5,7 @@ export const schema = {
   type: 'function',
   function: {
     name: 'search_incidents',
-    description: 'Search known incidents for the player issue. Returns relevance-ranked matches with scores and the terms that matched.',
+    description: 'Search known incidents for the player issue. Returns relevance-ranked matches with scores and the terms that matched. Treat a result as a perfect match only when the incident symptom, trigger/scenario, platform, region, and active/monitoring status all fit the current ticket.',
     parameters: {
       type: 'object',
       properties: {

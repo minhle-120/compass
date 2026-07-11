@@ -4,7 +4,7 @@ process.env.DB_PATH = ':memory:';
 process.env.WIKI_DB_PATH = ':memory:';
 process.env.INCIDENT_DB_PATH = ':memory:';
 
-const { getTicket, initDb, insertTicket } = await import('../../database/sqlite.js');
+const { getIncidentTicketSummary, getTicket, initDb, insertTicket } = await import('../../database/sqlite.js');
 const { initWikiDb } = await import('../../../services/wiki/wikiService.js');
 const { handler: readTicket } = await import('../read_ticket.js');
 const { handler: searchIncidents } = await import('../search_incidents.js');
@@ -78,6 +78,34 @@ describe('support workflow tools', () => {
       severity: 'high',
       rationale: expect.stringContaining('INC-004')
     }));
+  });
+
+  it('links a perfect incident match without requiring same-type ticket comparison first', async () => {
+    const search = await searchIncidents({
+      query: 'android crash startup update',
+      platform: 'Android',
+      region: 'Global',
+      status: 'active'
+    }, context);
+    expect(search.incidents[0].id).toBe('INC-004');
+
+    const classification = JSON.parse(await classifyTicket({
+      categories: ['bug'],
+      severity: 'medium',
+      rationale: 'The ticket exactly matches the active Android startup crash incident.',
+      problem_summary: 'Game crashes on Android startup',
+      problem_reason: 'Latest Android update is installed',
+      existing_incident_id: 'INC-004'
+    }, context));
+
+    expect(classification.existing_incident_id).toBe('INC-004');
+    expect(classification.problem.incident_id).toBe('INC-004');
+    expect(classification.incident).toMatchObject({
+      linked: true,
+      incident_id: 'INC-004'
+    });
+    expect(context.directIncidentLinked).toBe(true);
+    expect(getIncidentTicketSummary(['INC-004'])['INC-004'].ticket_ids).toContain('T-ANDROID');
   });
 
   it('persists routing and the drafted player response', async () => {

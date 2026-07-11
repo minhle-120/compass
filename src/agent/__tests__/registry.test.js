@@ -88,7 +88,28 @@ describe('tool registry outcomes', () => {
     }, context);
 
     expect(result).toMatchObject({ ok: false, error: { code: 'WORKFLOW_INCOMPLETE' } });
-    expect(result.missingSteps).toContain('compare_same_type_tickets');
+    expect(result.missingSteps).toContain('compare_same_type_tickets or classify_ticket with existing_incident_id');
+  });
+
+  it('allows a direct incident link instead of same-type ticket comparison', async () => {
+    const context = createSessionContext();
+    Object.assign(context.flags, {
+      wasTicketRead: true,
+      wasIncidentsChecked: true,
+      wasKnowledgeBaseChecked: true,
+      wasClassified: true,
+      wasResponseDrafted: true,
+      wasRouted: true
+    });
+    context.directIncidentLinked = true;
+
+    const result = await executeTool('idle', {
+      resolution_type: 'resolved',
+      reason: 'Matched an active incident exactly.'
+    }, context);
+
+    expect(result).toMatchObject({ ok: true, terminal: true });
+    expect(context.resolutionType).toBe('resolved');
   });
 
   it('requires media inspection before completing a ticket with attachments', async () => {

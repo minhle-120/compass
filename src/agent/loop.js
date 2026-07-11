@@ -112,6 +112,12 @@ function reconstructWorkflowFlags(messages, sessionContext) {
     if (toolName === 'read_ticket') {
       sessionContext.hasAttachments = Array.isArray(result.output?.attachments)
         && result.output.attachments.length > 0;
+    } else if (toolName === 'classify_ticket') {
+      const linkedIncidentId = parseLinkedIncidentId(result.output);
+      if (linkedIncidentId) {
+        sessionContext.directIncidentLinked = true;
+        sessionContext.linkedIncidentId = linkedIncidentId;
+      }
     }
 
     if (toolName === 'query_slang_dictionary') {
@@ -129,6 +135,18 @@ function reconstructWorkflowFlags(messages, sessionContext) {
       }
     }
   }
+}
+
+function parseLinkedIncidentId(output) {
+  if (typeof output === 'string') {
+    try {
+      const parsed = JSON.parse(output);
+      return parsed?.existing_incident_id || parsed?.problem?.incident_id || null;
+    } catch {
+      return null;
+    }
+  }
+  return output?.existing_incident_id || output?.problem?.incident_id || null;
 }
 
 function normalizeToolResult(result, toolName) {

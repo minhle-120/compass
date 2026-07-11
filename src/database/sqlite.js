@@ -4,7 +4,7 @@ import { dirname } from 'path';
 import { mkdirSync } from 'fs';
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
-import { upsertIncident } from '../../services/incident/incidentService.js';
+import { getIncidentDetails as getServiceIncidentDetails, upsertIncident } from '../../services/incident/incidentService.js';
 
 let db;
 
@@ -905,7 +905,7 @@ export function clusterTicketIntoProblem(
   reason,
   problemSummary,
   problemReason,
-  { existingProblemId } = {}
+  { existingProblemId, existingIncidentId } = {}
 ) {
   const database = getDb();
   const ticket = getTicket(ticketId);
@@ -928,6 +928,13 @@ export function clusterTicketIntoProblem(
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
   const problemSignature = buildProblemSignature(category, normalizedSummary, normalizedReason);
+  const normalizedExistingIncidentId = compactProblemText(existingIncidentId);
+  const existingIncident = normalizedExistingIncidentId
+    ? getServiceIncidentDetails(normalizedExistingIncidentId).incident
+    : null;
+  if (normalizedExistingIncidentId && !existingIncident) {
+    throw new Error(`Incident "${normalizedExistingIncidentId}" was not found.`);
+  }
 
   const existingLink = database.prepare(`
     SELECT p.id, p.category, p.severity, p.reason, p.status, p.source,
@@ -937,10 +944,19 @@ export function clusterTicketIntoProblem(
     WHERE pt.ticket_id = ?
   `).get(ticketId);
   if (existingLink) {
+    const linkedIncident = existingLink.incident_id
+      ? getServiceIncidentDetails(existingLink.incident_id).incident
+      : null;
     return {
       problem: existingLink,
       action: 'already_linked',
-      incident: existingLink.incident_id ? promoteProblemToIncident(existingLink.id) : null
+      incident: linkedIncident
+        ? {
+          linked: true,
+          incident_id: existingLink.incident_id,
+          incident: linkedIncident
+        }
+        : null
     };
   }
 
@@ -958,11 +974,25 @@ export function clusterTicketIntoProblem(
     }
 
     const now = new Date().toISOString();
+    if (normalizedExistingIncidentId && !existingProblem.incident_id) {
+      database.prepare(`
+        UPDATE problems
+        SET incident_id = ?, updated_at = ?
+        WHERE id = ?
+      `).run(normalizedExistingIncidentId, now, existingProblem.id);
+      existingProblem.incident_id = normalizedExistingIncidentId;
+    }
     database.prepare(`
       INSERT INTO problem_tickets (problem_id, ticket_id, linked_at)
       VALUES (?, ?, ?)
     `).run(existingProblem.id, ticketId, now);
-    const incident = promoteProblemToIncident(existingProblem.id);
+    const incident = normalizedExistingIncidentId
+      ? {
+        linked: true,
+        incident_id: normalizedExistingIncidentId,
+        incident: existingIncident
+      }
+      : promoteProblemToIncident(existingProblem.id);
     return { problem: existingProblem, action: 'added_to_existing_problem', incident };
   }
 
@@ -976,19 +1006,33 @@ export function clusterTicketIntoProblem(
 
   const now = new Date().toISOString();
   if (matchingProblem) {
+    if (normalizedExistingIncidentId && !matchingProblem.incident_id) {
+      database.prepare(`
+        UPDATE problems
+        SET incident_id = ?, updated_at = ?
+        WHERE id = ?
+      `).run(normalizedExistingIncidentId, now, matchingProblem.id);
+      matchingProblem.incident_id = normalizedExistingIncidentId;
+    }
     database.prepare(`
       INSERT INTO problem_tickets (problem_id, ticket_id, linked_at)
       VALUES (?, ?, ?)
     `).run(matchingProblem.id, ticketId, now);
-    const incident = promoteProblemToIncident(matchingProblem.id);
+    const incident = normalizedExistingIncidentId
+      ? {
+        linked: true,
+        incident_id: normalizedExistingIncidentId,
+        incident: existingIncident
+      }
+      : promoteProblemToIncident(matchingProblem.id);
     return { problem: matchingProblem, action: 'added_to_pile', incident };
   }
 
   const result = database.prepare(`
     INSERT INTO problems (
       category, severity, reason, status, source, description_signature,
-      problem_summary, problem_reason, problem_signature, created_at, updated_at
-    ) VALUES (?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?)
+      problem_summary, problem_reason, problem_signature, incident_id, created_at, updated_at
+    ) VALUES (?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     category,
     severity,
@@ -998,6 +1042,7 @@ export function clusterTicketIntoProblem(
     normalizedSummary,
     normalizedReason,
     problemSignature,
+    normalizedExistingIncidentId || null,
     now,
     now
   );
@@ -1011,13 +1056,19 @@ export function clusterTicketIntoProblem(
     source: ticketId,
     problem_summary: normalizedSummary,
     problem_reason: normalizedReason,
-    incident_id: null
+    incident_id: normalizedExistingIncidentId || null
   };
   database.prepare(`
     INSERT INTO problem_tickets (problem_id, ticket_id, linked_at)
     VALUES (?, ?, ?)
   `).run(problem.id, ticketId, now);
-  const incident = promoteProblemToIncident(problem.id);
+  const incident = normalizedExistingIncidentId
+    ? {
+      linked: true,
+      incident_id: normalizedExistingIncidentId,
+      incident: existingIncident
+    }
+    : promoteProblemToIncident(problem.id);
   return { problem, action: 'created_problem', incident };
 }
 
