@@ -1,4 +1,6 @@
 // src/tools/get_knowledge_base_article.js
+import { getDb } from '../database/sqlite.js';
+import { ensureKnowledgeBaseTable, parseJsonArray } from '../database/knowledgeBase.js';
 
 export const schema = {
   type: 'function',
@@ -19,5 +21,60 @@ export const schema = {
 };
 
 export async function handler(args, sessionContext) {
-  return 'Get knowledge base article stub';
+  const articleId = String(args?.article_id || '').trim();
+  if (!articleId) {
+    return {
+      found: false,
+      article_id: '',
+      message: 'article_id is required.'
+    };
+  }
+
+  try {
+    const database = getDb();
+    ensureKnowledgeBaseTable(database);
+
+    const article = database.prepare(`
+      SELECT
+        id,
+        title,
+        status,
+        platforms,
+        game_versions,
+        updated_at,
+        summary,
+        excerpt,
+        content
+      FROM kb_articles
+      WHERE lower(id) = lower(?)
+      LIMIT 1
+    `).get(articleId);
+
+    if (!article) {
+      return {
+        found: false,
+        article_id: articleId,
+        message: `Knowledge base article "${articleId}" was not found.`
+      };
+    }
+
+    return {
+      found: true,
+      article_id: article.id,
+      title: article.title,
+      status: article.status,
+      platforms: parseJsonArray(article.platforms),
+      game_versions: parseJsonArray(article.game_versions),
+      updated_at: article.updated_at,
+      summary: article.summary,
+      excerpt: article.excerpt,
+      content: article.content
+    };
+  } catch (error) {
+    return {
+      found: false,
+      article_id: articleId,
+      message: `Knowledge base lookup failed: ${error.message}`
+    };
+  }
 }
