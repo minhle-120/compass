@@ -53,7 +53,13 @@ export async function handler(args, sessionContext) {
         updated_at,
         summary,
         excerpt,
-        content
+        content,
+        source,
+        source_page_id,
+        source_revision_id,
+        source_url,
+        source_updated_at,
+        synced_at
       FROM kb_articles
       WHERE lower(id) = lower(?)
       LIMIT 1
@@ -77,7 +83,13 @@ export async function handler(args, sessionContext) {
       updated_at: article.updated_at,
       summary: article.summary,
       excerpt: article.excerpt,
-      content: article.content
+      content: article.content,
+      source: article.source || 'local',
+      source_page_id: article.source_page_id,
+      source_revision_id: article.source_revision_id,
+      source_url: article.source_url,
+      source_updated_at: article.source_updated_at,
+      synced_at: article.synced_at
     };
   } catch (error) {
     return {

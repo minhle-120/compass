@@ -79,7 +79,6 @@ export async function executeTool(name, args, sessionContext) {
   if (name === 'idle') {
     const resolutionType = args.resolution_type;
     const missing = [];
-<<<<<<< Updated upstream
 
     // All outcomes require the ticket to be read first
     if (!sessionContext.flags.wasTicketRead) {
@@ -88,14 +87,15 @@ export async function executeTool(name, args, sessionContext) {
 
     if (resolutionType === 'resolved') {
       if (!sessionContext.flags.wasIncidentsChecked) missing.push('search_incidents or get_incident_details');
+      if (!sessionContext.flags.wasKnowledgeBaseChecked) missing.push('search_knowledge_base or get_knowledge_base_article');
       if (!sessionContext.flags.wasClassified) missing.push('classify_ticket');
       if (!sessionContext.flags.wasResponseDrafted) missing.push('draft_response');
       if (!sessionContext.flags.wasRouted) missing.push('route_ticket');
     } else if (resolutionType === 'needs_clarification') {
       if (!sessionContext.flags.wasResponseDrafted) missing.push('draft_response');
     } else if (resolutionType === 'escalated') {
-
       if (!sessionContext.flags.wasIncidentsChecked) missing.push('search_incidents or get_incident_details');
+      if (!sessionContext.flags.wasKnowledgeBaseChecked) missing.push('search_knowledge_base or get_knowledge_base_article');
       if (!sessionContext.flags.wasClassified) missing.push('classify_ticket');
       if (!sessionContext.flags.wasRouted) missing.push('route_ticket');
     } else if (resolutionType === 'rejected') {
@@ -103,14 +103,6 @@ export async function executeTool(name, args, sessionContext) {
     } else {
       missing.push('valid resolution_type (resolved, needs_clarification, escalated, or rejected)');
     }
-=======
-    if (!sessionContext.flags.wasTicketRead) missing.push('read_ticket');
-    if (!sessionContext.flags.wasIncidentsChecked) missing.push('search_incidents or get_incident_details');
-    if (!sessionContext.flags.wasKnowledgeBaseChecked) missing.push('search_knowledge_base or get_knowledge_base_article');
-    if (!sessionContext.flags.wasClassified) missing.push('classify_ticket');
-    if (!sessionContext.flags.wasResponseDrafted) missing.push('draft_response');
-    if (!sessionContext.flags.wasRouted) missing.push('route_ticket');
->>>>>>> Stashed changes
 
     if (missing.length > 0) {
       const errorMsg = `Validation failed! For resolution_type "${resolutionType}", you are missing required steps: ${missing.join(', ')}.`;

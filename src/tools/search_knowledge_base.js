@@ -74,6 +74,8 @@ export async function handler(args, sessionContext) {
         summary,
         status,
         updated_at,
+        source,
+        source_url,
         CASE
           WHEN lower(id) = lower(?) THEN 100
           WHEN lower(title) = lower(?) THEN 80
@@ -93,7 +95,8 @@ export async function handler(args, sessionContext) {
       summary: row.summary,
       status: row.status,
       updated_at: row.updated_at,
-      source: 'knowledge_base_article',
+      source: row.source || 'local',
+      source_url: row.source_url,
       relevance: row.relevance
     }));
 

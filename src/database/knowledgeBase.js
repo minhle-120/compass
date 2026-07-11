@@ -18,6 +18,28 @@ export function ensureKnowledgeBaseTable(database) {
 
     CREATE INDEX IF NOT EXISTS idx_kb_articles_updated_at
       ON kb_articles(updated_at);
+
+    CREATE TABLE IF NOT EXISTS kb_sync_state (
+      source TEXT PRIMARY KEY,
+      last_started_at TEXT,
+      last_successful_at TEXT,
+      status TEXT NOT NULL DEFAULT 'never',
+      last_error TEXT,
+      pages_synced INTEGER NOT NULL DEFAULT 0
+    );
+  `);
+
+  ensureColumn(database, 'kb_articles', 'source', "TEXT NOT NULL DEFAULT 'local'");
+  ensureColumn(database, 'kb_articles', 'source_page_id', 'INTEGER');
+  ensureColumn(database, 'kb_articles', 'source_revision_id', 'INTEGER');
+  ensureColumn(database, 'kb_articles', 'source_url', 'TEXT');
+  ensureColumn(database, 'kb_articles', 'source_updated_at', 'TEXT');
+  ensureColumn(database, 'kb_articles', 'synced_at', 'TEXT');
+
+  database.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_kb_articles_source_page
+      ON kb_articles(source, source_page_id)
+      WHERE source_page_id IS NOT NULL;
   `);
 }
 
@@ -100,16 +122,20 @@ export function searchReferenceKnowledge(database, query, terms) {
     process.env.SLANG_DB_PATH || './data/slang.sqlite',
     (externalDb) => {
       const placeholders = terms.map(() => '?').join(', ');
+      const normalizedQuery = ` ${query.toLowerCase().replace(/[^a-z0-9_-]+/g, ' ').trim()} `;
       return externalDb.prepare(`
         SELECT id, slang, description
         FROM slang
         WHERE lower(slang) IN (${placeholders})
-           OR (length(slang) >= 3 AND instr(lower(?), lower(slang)) > 0)
+           OR (
+             length(slang) >= 3
+             AND instr(?, ' ' || lower(slang) || ' ') > 0
+           )
         ORDER BY
           CASE WHEN lower(slang) IN (${placeholders}) THEN 0 ELSE 1 END,
           length(slang) DESC
         LIMIT 10
-      `).all(...terms, query.toLowerCase(), ...terms);
+      `).all(...terms, normalizedQuery, ...terms);
     }
   ) || [];
 
@@ -250,4 +276,17 @@ function formatSlangContent(description, example, context) {
     example ? `Example: ${example}` : null,
     context ? `Context: ${context}` : null
   ].filter(Boolean).join('\n\n');
+}
+
+function ensureColumn(database, tableName, columnName, definition) {
+  const columns = database.prepare(`PRAGMA table_info(${tableName})`).all();
+  if (columns.some((column) => column.name === columnName)) return;
+
+  try {
+    database.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`);
+  } catch (error) {
+    if (!String(error.message).toLowerCase().includes('duplicate column')) {
+      throw error;
+    }
+  }
 }

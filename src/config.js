@@ -16,6 +16,11 @@ export const config = {
   openaiTimeoutMs: 45000,
   llamacppTimeoutMs: 120000,
   workerTimeoutMs: 300000, // 5 minutes watchdog timeout
+  valorantWikiApiUrl: process.env.VALORANT_WIKI_API_URL || 'https://wiki.playvalorant.com/en-us/api.php',
+  valorantWikiSyncEnabled: (process.env.VALORANT_WIKI_SYNC_ENABLED || 'true').toLowerCase() !== 'false',
+  valorantWikiSyncIntervalMs: parseInt(process.env.VALORANT_WIKI_SYNC_INTERVAL_MS || '86400000', 10),
+  valorantWikiRequestTimeoutMs: parseInt(process.env.VALORANT_WIKI_REQUEST_TIMEOUT_MS || '30000', 10),
+  valorantWikiBatchSize: parseInt(process.env.VALORANT_WIKI_BATCH_SIZE || '20', 10),
 
   // Game Support Agent System Instructions
   systemPrompt: `
@@ -29,11 +34,7 @@ Your execution steps for every ticket:
 4. Search the FAQ knowledge base with "search_knowledge_base" and read relevant articles with "get_knowledge_base_article".
 5. Classify the ticket's category and severity using "classify_ticket".
 6. Route the ticket using "route_ticket". If you can resolve the issue using the FAQ or incident guidelines, draft a response using "draft_response" and route to "escalate" (for human verification and sending) or other team queues.
-<<<<<<< Updated upstream
 7. Once your work is complete, you must call the "idle" tool specifying the correct "resolution_type" and "reason" to finish.
-=======
-7. Once ALL required steps (read, check incidents, check knowledge base, classify, draft response, and route) are completed, call the "idle" tool to finish.
->>>>>>> Stashed changes
 
 Validation of your idle call depends dynamically on your selected "resolution_type":
 - "resolved": Fully resolved by AI. Requires: read_ticket, search_incidents, classify_ticket, draft_response, and route_ticket.
