@@ -178,9 +178,9 @@ app.post('/api/tickets', (req, res) => {
   try {
     const ticketData = req.body;
     
-    // Request input validation
+    // Auto-generate ticket ID if not provided
     if (!ticketData.id || typeof ticketData.id !== 'string' || !ticketData.id.trim()) {
-      return res.status(400).json({ error: 'A valid string Ticket ID is required' });
+      ticketData.id = `T-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
     }
     if (!ticketData.subject || typeof ticketData.subject !== 'string' || !ticketData.subject.trim()) {
       return res.status(400).json({ error: 'A valid string Ticket Subject is required' });

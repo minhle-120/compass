@@ -16,19 +16,8 @@ document.addEventListener('DOMContentLoaded', () => {
     submitBtn.textContent = 'Submitting…';
 
     const payload = {
-      id: document.getElementById('ticket-id').value.trim(),
       subject: document.getElementById('ticket-subject').value.trim(),
-      description: document.getElementById('ticket-description').value.trim(),
-      requester_id: document.getElementById('ticket-requester').value.trim() || null,
-      account_id: document.getElementById('ticket-account').value.trim() || null,
-      platform: document.getElementById('ticket-platform').value || null,
-      region: document.getElementById('ticket-region').value || null,
-      device: document.getElementById('ticket-device').value.trim() || null,
-      game_version: document.getElementById('ticket-version').value.trim() || null,
-      locale: document.getElementById('ticket-locale').value.trim() || null,
-      transaction_id: document.getElementById('ticket-txn').value.trim() || null,
-      product: document.getElementById('ticket-product').value.trim() || null,
-      amount: document.getElementById('ticket-amount').value.trim() || null
+      description: document.getElementById('ticket-description').value.trim()
     };
 
     try {
