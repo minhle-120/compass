@@ -40,8 +40,10 @@ export async function handler(args, sessionContext) {
     throw new Error('No ticket ID is available for classification.');
   }
 
+  // 1. Persist the classification to the ticket record
   updateTicketClassification(ticketId, categories, severity, rationale);
-  // The first classification category is the ticket type used for grouping.
+
+  // 2. Perform deduplication clustering (using primary category categories[0])
   const clustering = clusterTicketIntoProblem(ticketId, categories[0], severity, rationale);
 
   return JSON.stringify({
