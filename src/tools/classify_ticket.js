@@ -1,4 +1,4 @@
-// src/tools/classify_ticket.js
+import { clusterTicketIntoProblem, updateTicketClassification } from '../database/sqlite.js';
 
 export const schema = {
   type: 'function',
@@ -34,5 +34,24 @@ export const schema = {
 };
 
 export async function handler(args, sessionContext) {
-  return 'Ticket classification stub';
+  const { ticketId } = sessionContext;
+  const { categories, severity, rationale } = args;
+  if (!ticketId) {
+    throw new Error('No ticket ID is available for classification.');
+  }
+
+  // 1. Persist the classification to the ticket record
+  updateTicketClassification(ticketId, categories, severity, rationale);
+
+  // 2. Perform deduplication clustering (using primary category categories[0])
+  const clustering = clusterTicketIntoProblem(ticketId, categories[0], severity, rationale);
+
+  return JSON.stringify({
+    ticket_id: ticketId,
+    categories,
+    severity,
+    rationale,
+    problem: clustering.problem,
+    problem_action: clustering.action
+  });
 }

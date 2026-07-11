@@ -51,6 +51,28 @@ export function initDb() {
       resolution_reason TEXT,
       workflow_revision INTEGER NOT NULL DEFAULT 0
     );
+
+    CREATE TABLE IF NOT EXISTS problems (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      category TEXT NOT NULL,
+      severity TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open', 'resolved', 'closed')),
+      source TEXT NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+      description_signature TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS problem_tickets (
+      problem_id INTEGER NOT NULL REFERENCES problems(id) ON DELETE CASCADE,
+      ticket_id TEXT NOT NULL UNIQUE REFERENCES tickets(id) ON DELETE CASCADE,
+      linked_at TEXT NOT NULL,
+      PRIMARY KEY (problem_id, ticket_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_problems_open_category_signature
+      ON problems(status, category, description_signature);
   `);
 
   const ticketColumns = db.prepare('PRAGMA table_info(tickets)').all();
@@ -327,4 +349,67 @@ export function getQueueStats() {
     stats[row.status] = row.count;
   }
   return stats;
+}
+
+export function clusterTicketIntoProblem(ticketId, category, severity, reason) {
+  const database = getDb();
+  const ticket = getTicket(ticketId);
+  if (!ticket) {
+    throw new Error(`Ticket "${ticketId}" not found.`);
+  }
+
+  // Ignore casing, punctuation, and repeated whitespace when comparing reports.
+  const descriptionSignature = String(ticket.description || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+  if (!descriptionSignature) {
+    throw new Error(`Ticket "${ticketId}" has no description to compare.`);
+  }
+
+  const existingLink = database.prepare(`
+    SELECT p.id, p.category, p.severity, p.reason, p.status, p.source
+    FROM problem_tickets pt
+    JOIN problems p ON p.id = pt.problem_id
+    WHERE pt.ticket_id = ?
+  `).get(ticketId);
+  if (existingLink) {
+    return { problem: existingLink, action: 'already_linked' };
+  }
+
+  const matchingProblem = database.prepare(`
+    SELECT id, category, severity, reason, status, source
+    FROM problems
+    WHERE status = 'open' AND category = ? AND description_signature = ?
+    LIMIT 1
+  `).get(category, descriptionSignature);
+
+  const now = new Date().toISOString();
+  if (matchingProblem) {
+    database.prepare(`
+      INSERT INTO problem_tickets (problem_id, ticket_id, linked_at)
+      VALUES (?, ?, ?)
+    `).run(matchingProblem.id, ticketId, now);
+    return { problem: matchingProblem, action: 'added_to_pile' };
+  }
+
+  const result = database.prepare(`
+    INSERT INTO problems (
+      category, severity, reason, status, source, description_signature, created_at, updated_at
+    ) VALUES (?, ?, ?, 'open', ?, ?, ?, ?)
+  `).run(category, severity, reason, ticketId, descriptionSignature, now, now);
+
+  const problem = {
+    id: Number(result.lastInsertRowid),
+    category,
+    severity,
+    reason,
+    status: 'open',
+    source: ticketId
+  };
+  database.prepare(`
+    INSERT INTO problem_tickets (problem_id, ticket_id, linked_at)
+    VALUES (?, ?, ?)
+  `).run(problem.id, ticketId, now);
+  return { problem, action: 'created_problem' };
 }
