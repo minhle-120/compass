@@ -1,18 +1,24 @@
 // src/tools/search_knowledge_base.js
 import { getDb } from '../database/sqlite.js';
-import { ensureKnowledgeBaseTable } from '../database/knowledgeBase.js';
+import { ensureKnowledgeBaseTable, searchReferenceKnowledge } from '../database/knowledgeBase.js';
+
+const STOP_WORDS = new Set([
+  'a', 'an', 'and', 'are', 'as', 'at', 'be', 'for', 'from', 'i', 'in',
+  'is', 'it', 'my', 'of', 'on', 'or', 'that', 'the', 'this', 'to', 'was',
+  'with', 'you', 'your'
+]);
 
 export const schema = {
   type: 'function',
   function: {
     name: 'search_knowledge_base',
-    description: 'Search the game knowledge base and FAQ for articles matching the given query. Returns a list of matching article IDs and summaries.',
+    description: 'Search the game knowledge base, FAQ, terminology, and slang for entries matching the given query. Returns matching IDs and summaries.',
     parameters: {
       type: 'object',
       properties: {
         query: {
           type: 'string',
-          description: 'Keywords to search for in the knowledge base.'
+          description: 'Keywords, player text, or slang to search for in the knowledge base.'
         }
       },
       required: ['query']
@@ -35,7 +41,8 @@ export async function handler(args, sessionContext) {
     .toLowerCase()
     .match(/[a-z0-9_-]+/g)
     ?.filter((term, index, values) => values.indexOf(term) === index)
-    .slice(0, 8) || [];
+    .filter((term) => !STOP_WORDS.has(term))
+    .slice(0, 24) || [];
 
   if (terms.length === 0) {
     return {
@@ -60,7 +67,7 @@ export async function handler(args, sessionContext) {
     const database = getDb();
     ensureKnowledgeBaseTable(database);
 
-    const rows = database.prepare(`
+    const articleRows = database.prepare(`
       SELECT
         id,
         title,
@@ -80,16 +87,26 @@ export async function handler(args, sessionContext) {
       LIMIT 10
     `).all(query, query, `%${query}%`, `%${query}%`, ...params);
 
+    const articleResults = articleRows.map((row) => ({
+      article_id: row.id,
+      title: row.title,
+      summary: row.summary,
+      status: row.status,
+      updated_at: row.updated_at,
+      source: 'knowledge_base_article',
+      relevance: row.relevance
+    }));
+
+    const referenceResults = searchReferenceKnowledge(database, query, terms);
+    const combinedResults = [...articleResults, ...referenceResults]
+      .sort((left, right) => right.relevance - left.relevance)
+      .slice(0, 10)
+      .map(({ relevance, ...result }) => result);
+
     return {
       query,
-      total_matches: rows.length,
-      results: rows.map((row) => ({
-        article_id: row.id,
-        title: row.title,
-        summary: row.summary,
-        status: row.status,
-        updated_at: row.updated_at
-      }))
+      total_matches: combinedResults.length,
+      results: combinedResults
     };
   } catch (error) {
     return {

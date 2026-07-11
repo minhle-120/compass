@@ -1,18 +1,22 @@
 // src/tools/get_knowledge_base_article.js
 import { getDb } from '../database/sqlite.js';
-import { ensureKnowledgeBaseTable, parseJsonArray } from '../database/knowledgeBase.js';
+import {
+  ensureKnowledgeBaseTable,
+  getReferenceKnowledge,
+  parseJsonArray
+} from '../database/knowledgeBase.js';
 
 export const schema = {
   type: 'function',
   function: {
     name: 'get_knowledge_base_article',
-    description: 'Get the full content of a specific knowledge base article by its ID. Returns the complete article text.',
+    description: 'Get the full content of a knowledge base article, terminology entry, or slang definition by its search result ID.',
     parameters: {
       type: 'object',
       properties: {
         article_id: {
           type: 'string',
-          description: 'The ID of the knowledge base article to retrieve.'
+          description: 'The article_id returned by search_knowledge_base.'
         }
       },
       required: ['article_id']
@@ -33,6 +37,11 @@ export async function handler(args, sessionContext) {
   try {
     const database = getDb();
     ensureKnowledgeBaseTable(database);
+
+    const reference = getReferenceKnowledge(database, articleId);
+    if (reference) {
+      return reference;
+    }
 
     const article = database.prepare(`
       SELECT
