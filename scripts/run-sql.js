@@ -5,7 +5,7 @@ import { dirname, resolve } from 'path';
 
 const args = process.argv.slice(2);
 const dbOptionIndex = args.indexOf('--db');
-let dbPath = process.env.GAME_KNOWLEDGE_DB_PATH || './data/Game Knowledge Base.sqlite';
+let dbPath = null;
 
 if (dbOptionIndex !== -1) {
   if (!args[dbOptionIndex + 1]) {
@@ -17,6 +17,11 @@ if (dbOptionIndex !== -1) {
 }
 
 const sqlFiles = args;
+
+if (!dbPath) {
+  console.error('Specify the target database with --db <path>.');
+  process.exit(1);
+}
 
 if (sqlFiles.length === 0) {
   console.error('No SQL files provided.');

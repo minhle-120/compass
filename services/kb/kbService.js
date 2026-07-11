@@ -1,85 +1,133 @@
-import { searchSlang, getSlangById } from '../slang/slangService.js';
+import { config } from '../../src/config.js';
+import { fetchJson } from '../http/jsonClient.js';
 
-// Ensures the primary database has the kb_articles table for FAQs
-export function ensureKnowledgeBaseTable(database) {
-  database.exec(`
-    CREATE TABLE IF NOT EXISTS kb_articles (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'published',
-      platforms TEXT,
-      game_versions TEXT,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      summary TEXT NOT NULL,
-      excerpt TEXT NOT NULL DEFAULT '',
-      content TEXT NOT NULL
-    );
+const articleCache = new Map();
 
-    CREATE INDEX IF NOT EXISTS idx_kb_articles_updated_at
-      ON kb_articles(updated_at);
-  `);
+export async function searchValorantWiki(query, options = {}) {
+  const url = createWikiUrl({
+    action: 'query',
+    list: 'search',
+    srsearch: query,
+    srnamespace: 0,
+    srlimit: 10,
+    srprop: 'snippet|timestamp|wordcount'
+  });
+
+  const payload = await fetchJson(url, options);
+  return (payload.query?.search || []).map((result) => ({
+    article_id: `wiki:${result.pageid}`,
+    title: result.title,
+    summary: cleanSnippet(result.snippet) || `Valorant Wiki page for ${result.title}.`,
+    status: 'published',
+    updated_at: result.timestamp || null,
+    source: 'valorant_wiki',
+    source_url: buildPageUrl(result.title)
+  }));
 }
 
-export function parseJsonArray(value) {
-  if (!value) return [];
+export async function getValorantWikiArticle(articleId, options = {}) {
+  if (!articleId.startsWith('wiki:')) return null;
 
-  try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-// Searches the merged slang/terminology database via the slangService
-export function searchReferenceKnowledge(database, query, terms) {
-  const results = [];
-  const rows = searchSlang(query, terms) || [];
-
-  for (const row of rows) {
-    results.push({
-      article_id: `slang:${row.id}`,
-      title: row.slang,
-      summary: row.description || '',
-      status: 'reference',
-      updated_at: null,
-      source: row.source === 'game' ? 'game_terminology' : 'genz_slang',
-      relevance: row.source === 'game' ? 95 : 80
-    });
+  const cached = articleCache.get(articleId);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.value;
   }
 
-  return results;
+  const pageId = articleId.slice('wiki:'.length);
+  if (!/^\d+$/.test(pageId)) return null;
+
+  const url = createWikiUrl({
+    action: 'query',
+    pageids: pageId,
+    prop: 'extracts|info|revisions',
+    explaintext: 1,
+    exsectionformat: 'plain',
+    inprop: 'url',
+    rvprop: 'ids|timestamp',
+    rvlimit: 1,
+    redirects: 1
+  });
+
+  const payload = await fetchJson(url, options);
+  const page = payload.query?.pages?.find((candidate) => !candidate.missing);
+  if (!page) return null;
+
+  const revision = page.revisions?.[0] || {};
+  const content = normalizeExtract(page.extract, page.title);
+  const article = {
+    found: true,
+    article_id: `wiki:${page.pageid}`,
+    title: page.title,
+    status: 'published',
+    summary: summarize(content, 500),
+    excerpt: summarize(content, 1200),
+    content,
+    source: 'valorant_wiki',
+    source_page_id: page.pageid,
+    source_revision_id: revision.revid || null,
+    source_url: page.fullurl || buildPageUrl(page.title),
+    source_updated_at: revision.timestamp || null
+  };
+
+  articleCache.set(article.article_id, {
+    value: article,
+    expiresAt: Date.now() + config.remoteContentCacheTtlMs
+  });
+
+  return article;
 }
 
-// Retrieves details for a specific reference knowledge article via the slangService
-export function getReferenceKnowledge(database, articleId) {
-  if (articleId.startsWith('slang:')) {
-    const id = articleId.slice('slang:'.length);
-    const row = getSlangById(id);
+export function clearValorantWikiCache() {
+  articleCache.clear();
+}
 
-    if (!row) return null;
+function createWikiUrl(params) {
+  const url = new URL(config.valorantWikiApiUrl);
+  const requestParams = {
+    format: 'json',
+    formatversion: 2,
+    maxlag: 5,
+    ...params
+  };
 
-    return {
-      found: true,
-      article_id: articleId,
-      source: row.source === 'game' ? 'game_terminology' : 'genz_slang',
-      title: row.slang,
-      status: 'reference',
-      summary: row.description || '',
-      excerpt: row.example || '',
-      content: formatSlangContent(row.description, row.example, row.context),
-      example: row.example,
-      context: row.context
-    };
+  for (const [key, value] of Object.entries(requestParams)) {
+    url.searchParams.set(key, String(value));
   }
 
-  return null;
+  return url;
 }
 
-function formatSlangContent(description, example, context) {
-  return [
-    description,
-    example ? `Example: ${example}` : null,
-    context ? `Context: ${context}` : null
-  ].filter(Boolean).join('\n\n');
+function buildPageUrl(title) {
+  const slug = encodeURIComponent(String(title).replace(/ /g, '_'));
+  return `https://wiki.playvalorant.com/en-us/${slug}`;
+}
+
+function cleanSnippet(snippet) {
+  return decodeEntities(String(snippet || '').replace(/<[^>]*>/g, ' '))
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function decodeEntities(value) {
+  return value
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;|&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+}
+
+function normalizeExtract(extract, title) {
+  const content = String(extract || '')
+    .replace(/\r/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  return content || `${title} is a Valorant Wiki page. Open the source URL for complete details.`;
+}
+
+function summarize(content, maxLength) {
+  const firstParagraph = content.split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim();
+  if (firstParagraph.length <= maxLength) return firstParagraph;
+  return `${firstParagraph.slice(0, maxLength - 1).trimEnd()}...`;
 }

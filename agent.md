@@ -6,16 +6,17 @@ Compass is a tool-driven game support agent. The Express server accepts tickets,
 
 ```text
 compass/
-|-- data/                  # Generated SQLite databases (gitignored)
+|-- data/                  # Ticket and incident runtime data
 |-- public/                # Browser dashboard
-|-- resources/
-|   |-- source/            # Original import source files
-|   `-- sql/               # Database schemas and seed data
-|-- scripts/               # Database initialization and sync commands
+|-- resources/sql/        # Ticket and incident schemas
+|-- scripts/               # Schema utility commands
+|-- services/
+|   |-- http/              # Shared remote JSON client
+|   |-- kb/                # Direct Valorant Wiki service
+|   `-- slang/             # Direct Hugging Face dataset service
 |-- src/
 |   |-- agent/             # LLM execution loop and tool registry
-|   |-- database/          # SQLite adapters and knowledge cache
-|   |-- services/          # Background synchronization services
+|   |-- database/          # Ticket queue adapter
 |   |-- tools/             # Tool schemas and handlers
 |   |-- utils/             # Shared utilities
 |   |-- worker/            # Worker pool and thread entry point
@@ -28,54 +29,33 @@ compass/
 
 ## Runtime Flow
 
-1. The Express API stores a new ticket in `data/database.sqlite`.
-2. The Valorant Wiki service refreshes the local knowledge cache when stale.
-3. The worker pool claims the oldest pending ticket.
-4. A worker starts the tool-call loop for that ticket.
-5. Tools read ticket, incident, wiki, terminology, and slang data.
+1. The Express API queues a ticket.
+2. The worker pool claims the oldest pending ticket.
+3. A worker starts the tool-call loop.
+4. Knowledge tools query the live Valorant Wiki and Hugging Face dataset APIs.
+5. Full remote entries are cached in memory for up to 24 hours.
 6. The `idle` tool validates the selected resolution type.
 7. The ticket is marked completed or escalated.
 
-## Knowledge Base
+## Remote Knowledge
 
-`src/services/valorantWikiSync.js` imports main-namespace pages from the Valorant Wiki into `kb_articles`. The first run performs a full import. Later runs use MediaWiki recent changes and refresh only new or edited pages.
+`search_knowledge_base` queries the Valorant Wiki and checks meaningful words against `MLBtrio/genz-slang-dataset`. Returned `wiki:` and `slang:` IDs can be passed directly to `get_knowledge_base_article`.
 
-The application checks the cache at startup and schedules another check every 24 hours. Configure this behavior with:
+`query_slang_dictionary` requests the encountered term directly from the Hugging Face Dataset Viewer API. No wiki or slang content is persisted locally. In-memory entries expire after `REMOTE_CONTENT_CACHE_TTL_MS`, which defaults to one day.
+
+Configure the providers with:
 
 - `VALORANT_WIKI_API_URL`
-- `VALORANT_WIKI_SYNC_ENABLED`
-- `VALORANT_WIKI_SYNC_INTERVAL_MS`
-- `VALORANT_WIKI_REQUEST_TIMEOUT_MS`
-- `VALORANT_WIKI_BATCH_SIZE`
-
-Run an immediate incremental refresh with:
-
-```powershell
-node scripts/sync-valorant-wiki.js
-```
-
-Force a complete reimport with:
-
-```powershell
-node scripts/sync-valorant-wiki.js --full
-```
-
-## Database Files
-
-- `data/database.sqlite`: ticket queue and cached knowledge-base articles.
-- `data/Game Knowledge Base.sqlite`: local Valorant terminology and game mechanics.
-- `data/slang.sqlite`: imported Gen-Z slang dataset.
-- `data/tickets.sqlite`: standalone ticket records.
-- `data/incidents.sqlite`: standalone incident records.
+- `HUGGINGFACE_DATASET_API_URL`
+- `GENZ_SLANG_DATASET`
+- `REMOTE_CONTENT_CACHE_TTL_MS`
+- `REMOTE_REQUEST_TIMEOUT_MS`
 
 ## Commands
 
 ```powershell
 npm.cmd install
-npm.cmd run db:init
-npm.cmd run db:init:slang
-npm.cmd run db:init:tickets
-npm.cmd run db:init:incidents
+npm.cmd test
 npm.cmd start
 ```
 

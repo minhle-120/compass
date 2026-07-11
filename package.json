@@ -7,9 +7,7 @@
   "scripts": {
     "start": "node src/index.js",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "db:init": "node services/slang/run-import.js",
-    "db:seed": "node services/slang/run-import.js"
+    "test:watch": "vitest"
   },
   "dependencies": {
     "axios": "1.18.1",

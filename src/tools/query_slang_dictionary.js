@@ -5,13 +5,13 @@ export const schema = {
   type: 'function',
   function: {
     name: 'query_slang_dictionary',
-    description: 'Look up gaming slang, gaming terms, or unknown words in the slang dictionary. Returns the meaning/definition of gaming-specific and Gen-Z terminology.',
+    description: 'Look up a slang term directly in the current MLBtrio/genz-slang-dataset on Hugging Face.',
     parameters: {
       type: 'object',
       properties: {
         term: {
           type: 'string',
-          description: 'The slang term or unknown word to look up.'
+          description: 'The slang term encountered in the player message.'
         }
       },
       required: ['term']
@@ -26,13 +26,12 @@ export async function handler(args, sessionContext) {
   }
 
   try {
-    const row = lookupSlang(term);
+    const row = await lookupSlang(term);
 
     if (row) {
-      const type = row.source === 'game' ? 'Gaming Term' : 'Gen-Z Slang';
       const exampleStr = row.example ? `\nExample: ${row.example}` : '';
       const contextStr = row.context ? `\nContext: ${row.context}` : '';
-      return `[${type}] ${row.slang}: ${row.description}${exampleStr}${contextStr}`;
+      return `[Gen-Z Slang] ${row.slang}: ${row.description}${exampleStr}${contextStr}`;
     }
 
     return `No slang definition found for "${term}".`;

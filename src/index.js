@@ -8,7 +8,6 @@ import { config } from './config.js';
 import { logger } from './utils/logger.js';
 import { initDb, resetInterruptedTickets, getTicket, insertTicket, getDb, getQueueStats } from './database/sqlite.js';
 import { pool } from './worker/pool.js';
-import { startValorantWikiSync } from './services/valorantWikiSync.js';
 
 
 
@@ -18,7 +17,6 @@ const __dirname = dirname(__filename);
 // Initialize DB schema and reset interrupted tickets
 initDb();
 resetInterruptedTickets();
-startValorantWikiSync();
 
 // Start worker thread pool
 pool.start();
