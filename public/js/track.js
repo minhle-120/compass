@@ -76,10 +76,17 @@ document.addEventListener('DOMContentLoaded', () => {
         ticketResolution.style.display = 'none';
       }
 
-      // Stop polling once ticket has a terminal status
-      if (!['pending', 'running', 'awaiting_review'].includes(ticket.status) && pollInterval) {
-        clearInterval(pollInterval);
-        pollInterval = null;
+      // Manage polling dynamically based on status
+      const isActive = ['pending', 'running', 'awaiting_review'].includes(ticket.status);
+      if (isActive) {
+        if (!pollInterval) {
+          pollInterval = setInterval(fetchTicketDetails, 4000);
+        }
+      } else {
+        if (pollInterval) {
+          clearInterval(pollInterval);
+          pollInterval = null;
+        }
       }
 
       // Update date format

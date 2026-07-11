@@ -27,10 +27,18 @@ document.addEventListener('DOMContentLoaded', () => {
   historyHuman.addEventListener('click', () => setHistoryMode('human'));
   historyRaw.addEventListener('click', () => setHistoryMode('raw'));
 
+  let activeDetailTicketId = null;
+
   // Close detail panel
-  detailClose.addEventListener('click', () => { detailOverlay.style.display = 'none'; });
+  detailClose.addEventListener('click', () => {
+    detailOverlay.style.display = 'none';
+    activeDetailTicketId = null;
+  });
   detailOverlay.addEventListener('click', (e) => {
-    if (e.target === detailOverlay) detailOverlay.style.display = 'none';
+    if (e.target === detailOverlay) {
+      detailOverlay.style.display = 'none';
+      activeDetailTicketId = null;
+    }
   });
 
   // Helpers
@@ -153,6 +161,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Open ticket detail overlay
   async function openDetail(ticketId) {
+    activeDetailTicketId = ticketId;
     detailOverlay.style.display = 'block';
     detailTitle.textContent = ticketId;
     detailFields.innerHTML = '<dd>Loading…</dd>';
@@ -161,9 +170,14 @@ document.addEventListener('DOMContentLoaded', () => {
     detailActions.style.display = 'none';
     detailActions.innerHTML = '';
 
+    await refreshDetail(ticketId);
+  }
+
+  async function refreshDetail(ticketId) {
     // Fetch ticket detail
     try {
       const res = await fetch(`/api/tickets/${ticketId}?staff=true`);
+      if (activeDetailTicketId !== ticketId) return;
       const t = await res.json();
 
       const fields = [
@@ -184,29 +198,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (t.draft_status === 'pending_review' && t.draft_response) {
         detailActions.style.display = 'block';
-        detailActions.innerHTML = '<button class="btn btn-primary" id="approve-draft">Approve & Send Response</button>';
-        document.getElementById('approve-draft').addEventListener('click', async () => {
-          const button = document.getElementById('approve-draft');
-          button.disabled = true;
-          button.textContent = 'Publishing…';
-          const response = await fetch(`/api/tickets/${encodeURIComponent(ticketId)}/draft/approve`, { method: 'POST' });
-          if (response.ok) {
-            await openDetail(ticketId);
-            await fetchTickets();
-          } else {
-            const error = await response.json().catch(() => ({}));
-            button.disabled = false;
-            button.textContent = error.error || 'Approval failed';
-          }
-        });
+        if (!document.getElementById('approve-draft')) {
+          detailActions.innerHTML = '<button class="btn btn-primary" id="approve-draft">Approve & Send Response</button>';
+          document.getElementById('approve-draft').addEventListener('click', async () => {
+            const button = document.getElementById('approve-draft');
+            button.disabled = true;
+            button.textContent = 'Publishing…';
+            const response = await fetch(`/api/tickets/${encodeURIComponent(ticketId)}/draft/approve`, { method: 'POST' });
+            if (response.ok) {
+              await refreshDetail(ticketId);
+              await fetchTickets();
+            } else {
+              const error = await response.json().catch(() => ({}));
+              button.disabled = false;
+              button.textContent = error.error || 'Approval failed';
+            }
+          });
+        }
+      } else {
+        detailActions.style.display = 'none';
+        detailActions.innerHTML = '';
       }
     } catch (err) {
-      detailFields.innerHTML = '<dd>Failed to load ticket.</dd>';
+      if (activeDetailTicketId === ticketId) {
+        detailFields.innerHTML = '<dd>Failed to load ticket.</dd>';
+      }
     }
 
     // Fetch conversation history
     try {
       const res = await fetch(`/api/tickets/${ticketId}/history`);
+      if (activeDetailTicketId !== ticketId) return;
       if (!res.ok) {
         detailHistory.innerHTML = '<div class="text-muted">No history available.</div>';
         return;
@@ -214,7 +236,9 @@ document.addEventListener('DOMContentLoaded', () => {
       currentHistory = await res.json();
       renderCurrentHistory();
     } catch (err) {
-      detailHistory.innerHTML = '<div class="text-muted">Failed to load history.</div>';
+      if (activeDetailTicketId === ticketId) {
+        detailHistory.innerHTML = '<div class="text-muted">Failed to load history.</div>';
+      }
     }
   }
 
@@ -253,5 +277,8 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(() => {
     fetchSystemStatus();
     fetchTickets();
+    if (activeDetailTicketId) {
+      refreshDetail(activeDetailTicketId);
+    }
   }, POLL_INTERVAL);
 });
