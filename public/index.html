@@ -37,150 +37,202 @@
   </header>
 
   <main class="main-container">
-    <!-- Grid Layout: Form on left, Queue/Dashboard on right -->
-    <div class="grid-layout">
-      
-      <!-- Column 1: Submit Ticket Form -->
-      <section class="form-section card glass">
-        <div class="card-header">
-          <i data-lucide="plus-circle" class="header-icon"></i>
-          <h2>Submit Support Ticket</h2>
-          <p>Simulate a player filing a support request</p>
-        </div>
+    <!-- Dashboard Tab Switcher -->
+    <div class="tab-container glass">
+      <button class="tab-btn active" data-tab="queue-tab">
+        <i data-lucide="list-todo"></i>
+        <span>Ticket Queue</span>
+      </button>
+      <button class="tab-btn" data-tab="history-tab">
+        <i data-lucide="history"></i>
+        <span>Agent Run History</span>
+      </button>
+    </div>
+
+    <!-- Tab 1: Ticket Queue View -->
+    <div id="queue-tab" class="tab-content active">
+      <div class="grid-layout">
         
-        <form id="ticket-form" class="ticket-form">
-          <div class="form-row">
-            <div class="form-group">
-              <label for="ticket-id">Ticket ID</label>
-              <div class="input-wrapper">
-                <i data-lucide="hash" class="input-icon"></i>
-                <input type="text" id="ticket-id" required placeholder="T-1001">
-              </div>
-            </div>
-            <div class="form-group">
-              <label for="locale">Player Locale</label>
-              <div class="input-wrapper">
-                <i data-lucide="languages" class="input-icon"></i>
-                <select id="locale">
-                  <option value="en-US">en-US (English)</option>
-                  <option value="vi-VN">vi-VN (Vietnamese)</option>
-                  <option value="zh-CN">zh-CN (Chinese)</option>
-                  <option value="es-ES">es-ES (Spanish)</option>
-                </select>
-              </div>
-            </div>
+        <!-- Column 1: Submit Ticket Form -->
+        <section class="form-section card glass">
+          <div class="card-header">
+            <i data-lucide="plus-circle" class="header-icon"></i>
+            <h2>Submit Support Ticket</h2>
+            <p>Simulate a player filing a support request</p>
           </div>
-
-          <div class="form-group">
-            <label for="subject">Subject</label>
-            <div class="input-wrapper">
-              <i data-lucide="tag" class="input-icon"></i>
-              <input type="text" id="subject" required placeholder="e.g. Premium pass charged twice">
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label for="player-id">Player ID</label>
-              <div class="input-wrapper">
-                <i data-lucide="user" class="input-icon"></i>
-                <input type="text" id="player-id" placeholder="player_4821">
-              </div>
-            </div>
-            <div class="form-group">
-              <label for="account-id">Game Account ID</label>
-              <div class="input-wrapper">
-                <i data-lucide="shield" class="input-icon"></i>
-                <input type="text" id="account-id" placeholder="account_9917">
-              </div>
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label for="platform">Platform</label>
-              <div class="input-wrapper">
-                <i data-lucide="smartphone" class="input-icon"></i>
-                <select id="platform">
-                  <option value="Android">Android</option>
-                  <option value="iOS">iOS</option>
-                  <option value="PC">PC</option>
-                </select>
-              </div>
-            </div>
-            <div class="form-group">
-              <label for="region">Region</label>
-              <div class="input-wrapper">
-                <i data-lucide="globe" class="input-icon"></i>
-                <select id="region">
-                  <option value="SEA">SEA (Southeast Asia)</option>
-                  <option value="NA">NA (North America)</option>
-                  <option value="EU">EU (Europe)</option>
-                  <option value="Global">Global</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label for="description">Issue Description (Gaming slang supported)</label>
-            <textarea id="description" rows="4" required placeholder="Describe what happened... e.g. I got double billed for battle pass and the game is lagging, massive gap diff."></textarea>
-          </div>
-
-          <!-- Collapsible Billing Details -->
-          <details class="billing-details-summary">
-            <summary><i data-lucide="credit-card"></i> Add Transaction Details (Optional)</summary>
-            <div class="billing-content form-card">
-              <div class="form-row">
-                <div class="form-group">
-                  <label for="transaction-id">Transaction ID</label>
-                  <input type="text" id="transaction-id" placeholder="TXN-883102">
-                </div>
-                <div class="form-group">
-                  <label for="product">Product / Item</label>
-                  <input type="text" id="product" placeholder="Premium Battle Pass">
+          
+          <form id="ticket-form" class="ticket-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="ticket-id">Ticket ID</label>
+                <div class="input-wrapper">
+                  <i data-lucide="hash" class="input-icon"></i>
+                  <input type="text" id="ticket-id" required placeholder="T-1001">
                 </div>
               </div>
               <div class="form-group">
-                <label for="amount">Charged Amount</label>
-                <input type="text" id="amount" placeholder="249,000 VND">
+                <label for="locale">Player Locale</label>
+                <div class="input-wrapper">
+                  <i data-lucide="languages" class="input-icon"></i>
+                  <select id="locale">
+                    <option value="en-US">en-US (English)</option>
+                    <option value="vi-VN">vi-VN (Vietnamese)</option>
+                    <option value="zh-CN">zh-CN (Chinese)</option>
+                    <option value="es-ES">es-ES (Spanish)</option>
+                  </select>
+                </div>
               </div>
             </div>
-          </details>
 
-          <button type="submit" class="btn-primary">
-            <span>Queue Ticket for AI Processing</span>
-            <i data-lucide="send"></i>
-          </button>
-        </form>
-      </section>
+            <div class="form-group">
+              <label for="subject">Subject</label>
+              <div class="input-wrapper">
+                <i data-lucide="tag" class="input-icon"></i>
+                <input type="text" id="subject" required placeholder="e.g. Premium pass charged twice">
+              </div>
+            </div>
 
-      <!-- Column 2: Dashboard Monitor -->
-      <section class="dashboard-section">
-        <div class="section-header card-header-inline">
-          <div class="header-text-block">
-            <i data-lucide="list-todo" class="header-icon text-cyan"></i>
-            <h2>Live Ticket Queue</h2>
-            <p>Active routing and deflection pipeline</p>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="player-id">Player ID</label>
+                <div class="input-wrapper">
+                  <i data-lucide="user" class="input-icon"></i>
+                  <input type="text" id="player-id" placeholder="player_4821">
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="account-id">Game Account ID</label>
+                <div class="input-wrapper">
+                  <i data-lucide="shield" class="input-icon"></i>
+                  <input type="text" id="account-id" placeholder="account_9917">
+                </div>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="platform">Platform</label>
+                <div class="input-wrapper">
+                  <i data-lucide="smartphone" class="input-icon"></i>
+                  <select id="platform">
+                    <option value="Android">Android</option>
+                    <option value="iOS">iOS</option>
+                    <option value="PC">PC</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="region">Region</label>
+                <div class="input-wrapper">
+                  <i data-lucide="globe" class="input-icon"></i>
+                  <select id="region">
+                    <option value="SEA">SEA (Southeast Asia)</option>
+                    <option value="NA">NA (North America)</option>
+                    <option value="EU">EU (Europe)</option>
+                    <option value="Global">Global</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="description">Issue Description (Gaming slang supported)</label>
+              <textarea id="description" rows="4" required placeholder="Describe what happened... e.g. I got double billed for battle pass and the game is lagging, massive gap diff."></textarea>
+            </div>
+
+            <!-- Collapsible Billing Details -->
+            <details class="billing-details-summary">
+              <summary><i data-lucide="credit-card"></i> Add Transaction Details (Optional)</summary>
+              <div class="billing-content form-card">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="transaction-id">Transaction ID</label>
+                    <input type="text" id="transaction-id" placeholder="TXN-883102">
+                  </div>
+                  <div class="form-group">
+                    <label for="product">Product / Item</label>
+                    <input type="text" id="product" placeholder="Premium Battle Pass">
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="amount">Charged Amount</label>
+                  <input type="text" id="amount" placeholder="249,000 VND">
+                </div>
+              </div>
+            </details>
+
+            <button type="submit" class="btn-primary">
+              <span>Queue Ticket for AI Processing</span>
+              <i data-lucide="send"></i>
+            </button>
+          </form>
+        </section>
+
+        <!-- Column 2: Dashboard Monitor -->
+        <section class="dashboard-section">
+          <div class="section-header card-header-inline">
+            <div class="header-text-block">
+              <i data-lucide="list-todo" class="header-icon text-cyan"></i>
+              <h2>Live Ticket Queue</h2>
+              <p>Active routing and deflection pipeline</p>
+            </div>
+            <button id="refresh-btn" class="btn-icon" title="Refresh Queue">
+              <i data-lucide="refresh-cw"></i>
+            </button>
           </div>
-          <button id="refresh-btn" class="btn-icon" title="Refresh Queue">
-            <i data-lucide="refresh-cw"></i>
-          </button>
-        </div>
 
-        <div id="tickets-container" class="tickets-container">
-          <!-- Tickets will be dynamically rendered here -->
-          <div class="empty-state">
-            <i data-lucide="inbox"></i>
-            <p>No tickets in the queue. Use the form on the left to submit a ticket!</p>
+          <div id="tickets-container" class="tickets-container">
+            <!-- Tickets will be dynamically rendered here -->
+            <div class="empty-state">
+              <i data-lucide="inbox"></i>
+              <p>No tickets in the queue. Use the form on the left to submit a ticket!</p>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
+      </div>
     </div>
+
+    <!-- Tab 2: Agent Run History View -->
+    <div id="history-tab" class="tab-content">
+      <div class="history-split-layout">
+        <!-- Sidebar: List of runs -->
+        <aside class="history-sidebar glass">
+          <div class="sidebar-header">
+            <h3>Processed Runs</h3>
+            <p>Select a run to view prompt trace</p>
+          </div>
+          <div id="history-runs-list" class="history-runs-list">
+            <!-- Run items will be dynamically loaded here -->
+            <p class="empty-sidebar">No agent runs available.</p>
+          </div>
+        </aside>
+
+        <!-- Main Viewer: Timeline chat log -->
+        <section class="history-viewer glass">
+          <div id="viewer-header" class="viewer-header">
+            <div class="viewer-title-block">
+              <i data-lucide="bot" class="viewer-title-icon"></i>
+              <div>
+                <h3 id="viewer-title">No Run Selected</h3>
+                <p id="viewer-subtitle">Select an agent execution trace from the sidebar to audit the conversation log</p>
+              </div>
+            </div>
+          </div>
+          
+          <div id="viewer-body" class="viewer-body">
+            <div class="empty-state" style="padding-top: 10rem;">
+              <i data-lucide="scroll-text"></i>
+              <p>Select a processed run from the sidebar to inspect the model's ReAct decisions and prompts.</p>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
   </main>
 
-  <!-- History Modal / Drawer (Overlay) -->
+  <!-- History Modal / Drawer (Overlay for quick view) -->
   <div id="history-modal" class="modal-overlay">
     <div class="modal-content glass">
       <div class="modal-header">

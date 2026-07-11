@@ -8,13 +8,25 @@ document.addEventListener('DOMContentLoaded', () => {
   const ticketsContainer = document.getElementById('tickets-container');
   const refreshBtn = document.getElementById('refresh-btn');
   
-  // Modal DOM Elements
+  // Tab Elements
+  const tabButtons = document.querySelectorAll('.tab-btn');
+  const tabContents = document.querySelectorAll('.tab-content');
+  
+  // History Tab DOM Elements
+  const historyRunsList = document.getElementById('history-runs-list');
+  const viewerTitle = document.getElementById('viewer-title');
+  const viewerSubtitle = document.getElementById('viewer-subtitle');
+  const viewerBody = document.getElementById('viewer-body');
+  
+  // Modal DOM Elements (For quick view from Queue)
   const historyModal = document.getElementById('history-modal');
   const modalTicketId = document.getElementById('modal-ticket-id');
   const modalBody = document.getElementById('modal-body');
   const closeModalBtn = document.getElementById('close-modal-btn');
 
   let pollInterval = null;
+  let activeTab = 'queue-tab';
+  let selectedHistoryTicketId = null;
 
   // 1. Auto-generate unique Ticket ID on startup
   function generateTicketId() {
@@ -23,13 +35,16 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   generateTicketId();
 
-  // 2. Fetch all tickets and render the queue
-  async function fetchTickets() {
+  // 2. Fetch all tickets and render the queue/sidebar
+  async function fetchTickets(silent = false) {
     try {
       const response = await fetch('/api/tickets');
       if (!response.ok) throw new Error('Failed to fetch tickets');
       const tickets = await response.json();
+      
+      // Render components depending on current views
       renderTickets(tickets);
+      renderHistorySidebar(tickets);
       
       // If there are running or pending tickets, start polling
       const hasActive = tickets.some(t => t.status === 'running' || t.status === 'pending');
@@ -43,8 +58,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // 3. Render ticket list
+  // 3. Render ticket list (Queue Tab)
   function renderTickets(tickets) {
+    if (ticketsContainer.offsetParent === null) return; // Skip if tab is hidden
+
     if (tickets.length === 0) {
       ticketsContainer.innerHTML = `
         <div class="empty-state">
@@ -57,7 +74,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     ticketsContainer.innerHTML = tickets.map(ticket => {
-      // Determine status icon and color
       let statusIcon = 'clock';
       if (ticket.status === 'running') statusIcon = 'loader';
       if (ticket.status === 'completed') statusIcon = 'check-circle2';
@@ -143,7 +159,6 @@ document.addEventListener('DOMContentLoaded', () => {
       `;
     }).join('');
 
-    // Re-initialize Lucide icons for dynamically added elements
     lucide.createIcons();
 
     // Attach click listeners to "View Logs" buttons
@@ -154,10 +169,149 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 4. Polling functions to keep updates real-time
+  // 4. Render Sidebar list (History Tab)
+  function renderHistorySidebar(tickets) {
+    if (historyRunsList.offsetParent === null) return; // Skip if tab is hidden
+
+    // Filter tickets that have runs (or all tickets, but completed/failed/escalated runs are best)
+    const runs = tickets.filter(t => t.status === 'completed' || t.status === 'escalated' || t.status === 'failed');
+
+    if (runs.length === 0) {
+      historyRunsList.innerHTML = `<p class="empty-sidebar">No processed runs available.</p>`;
+      return;
+    }
+
+    historyRunsList.innerHTML = runs.map(run => {
+      const activeClass = selectedHistoryTicketId === run.id ? 'active' : '';
+      return `
+        <button class="run-item ${activeClass}" data-id="${run.id}">
+          <div class="run-item-header">
+            <span class="run-item-id">${run.id}</span>
+            <span class="badge badge-${run.status}" style="font-size: 0.65rem; padding: 0.15rem 0.45rem;">${run.status}</span>
+          </div>
+          <div class="run-item-subject">${run.subject || 'No Subject'}</div>
+          <div class="run-item-time">${new Date(run.updated_at || run.created_at).toLocaleTimeString()}</div>
+        </button>
+      `;
+    }).join('');
+
+    // Attach click listener to run list items
+    document.querySelectorAll('.run-item').forEach(item => {
+      item.addEventListener('click', () => {
+        selectedHistoryTicketId = item.dataset.id;
+        document.querySelectorAll('.run-item').forEach(el => el.classList.remove('active'));
+        item.classList.add('active');
+        fetchAndRenderHistoryTrace(selectedHistoryTicketId);
+      });
+    });
+  }
+
+  // 5. Fetch and Render Agent History Trace in main viewer panel
+  async function fetchAndRenderHistoryTrace(ticketId) {
+    viewerTitle.textContent = `Audit Log: ${ticketId}`;
+    viewerSubtitle.textContent = `Inspecting conversation and execution trace from the SQLite database and raw files`;
+    viewerBody.innerHTML = `
+      <div class="empty-state" style="border:none; padding-top: 10rem;">
+        <i data-lucide="loader" class="logo-spin"></i>
+        <p>Loading agent execution trace...</p>
+      </div>
+    `;
+    lucide.createIcons();
+
+    try {
+      const response = await fetch(`/api/tickets/${ticketId}/history`);
+      if (!response.ok) throw new Error('History trace file not found');
+      const history = await response.json();
+      
+      if (!history || history.length === 0) {
+        viewerBody.innerHTML = `
+          <div class="empty-state" style="border:none; padding-top: 10rem;">
+            <i data-lucide="scroll-text"></i>
+            <p>Execution logs are empty.</p>
+          </div>
+        `;
+        return;
+      }
+
+      viewerBody.innerHTML = history.map(step => {
+        let icon = 'message-square';
+        if (step.role === 'system') icon = 'settings';
+        if (step.role === 'user') icon = 'user';
+        if (step.role === 'assistant') icon = 'bot';
+        if (step.role === 'tool') icon = 'wrench';
+
+        const showToolCalls = step.tool_calls && step.tool_calls.length > 0;
+
+        return `
+          <div class="trace-step ${step.role}">
+            <div class="trace-icon">
+              <i data-lucide="${icon}"></i>
+            </div>
+            <div class="trace-content">
+              <div class="trace-meta">
+                <span class="trace-role">${step.role}</span>
+                ${step.timestamp ? `<span class="trace-time">${new Date(step.timestamp).toLocaleTimeString()}</span>` : ''}
+              </div>
+              
+              ${step.content ? `<div class="trace-text">${step.content}</div>` : ''}
+
+              ${showToolCalls ? `
+                <div class="trace-tool-calls">
+                  ${step.tool_calls.map(tc => `
+                    <div class="tool-call-card">
+                      <div class="tool-call-name">🛠️ Called: ${tc.function.name}()</div>
+                      ${tc.function.arguments && tc.function.arguments !== '{}' ? `
+                        <pre class="tool-call-args">${JSON.stringify(JSON.parse(tc.function.arguments), null, 2)}</pre>
+                      ` : ''}
+                    </div>
+                  `).join('')}
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    } catch (err) {
+      viewerBody.innerHTML = `
+        <div class="empty-state" style="border:none; color: #ef4444; padding-top: 10rem;">
+          <i data-lucide="alert-circle"></i>
+          <p>Failed to load trace: ${err.message}</p>
+        </div>
+      `;
+      lucide.createIcons();
+    }
+  }
+
+  // 6. Tab Switcher Logic
+  tabButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const targetTab = btn.dataset.tab;
+      activeTab = targetTab;
+      
+      // Update button state
+      tabButtons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      // Update content visibility
+      tabContents.forEach(content => {
+        if (content.id === targetTab) {
+          content.classList.add('active');
+        } else {
+          content.classList.remove('active');
+        }
+      });
+
+      // Refresh data
+      fetchTickets();
+    });
+  });
+
+  // 7. Polling functions
   function startPolling() {
     if (pollInterval) return;
-    pollInterval = setInterval(fetchTickets, 2000); // Poll every 2 seconds
+    pollInterval = setInterval(() => fetchTickets(true), 2000);
   }
 
   function stopPolling() {
@@ -167,39 +321,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // 5. Submit new ticket
+  // 8. Submit ticket form
   ticketForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    const ticketIdVal = document.getElementById('ticket-id').value;
-    const localeVal = document.getElementById('locale').value;
-    const subjectVal = document.getElementById('subject').value;
-    const playerIdVal = document.getElementById('player-id').value;
-    const accountIdVal = document.getElementById('account-id').value;
-    const platformVal = document.getElementById('platform').value;
-    const regionVal = document.getElementById('region').value;
-    const descriptionVal = document.getElementById('description').value;
-    
-    // Billing Details (optional)
-    const transactionIdVal = document.getElementById('transaction-id').value;
-    const productVal = document.getElementById('product').value;
-    const amountVal = document.getElementById('amount').value;
-
     const ticket = {
-      id: ticketIdVal,
-      subject: subjectVal,
-      requester_id: playerIdVal || null,
-      account_id: accountIdVal || null,
-      locale: localeVal,
-      region: regionVal,
-      platform: platformVal,
+      id: document.getElementById('ticket-id').value,
+      subject: document.getElementById('subject').value,
+      requester_id: document.getElementById('player-id').value || null,
+      account_id: document.getElementById('account-id').value || null,
+      locale: document.getElementById('locale').value,
+      region: document.getElementById('region').value,
+      platform: document.getElementById('platform').value,
       game_version: '4.18.2',
-      device: platformVal === 'Android' ? 'Samsung Galaxy S24' : (platformVal === 'iOS' ? 'iPhone 15' : 'PC Desktop'),
-      description: descriptionVal,
-      transaction_id: transactionIdVal || null,
-      product: productVal || null,
-      amount: amountVal || null,
-      attachments: transactionIdVal ? [{ filename: 'receipt.png' }] : [],
+      device: document.getElementById('platform').value === 'Android' ? 'Samsung Galaxy S24' : (document.getElementById('platform').value === 'iOS' ? 'iPhone 15' : 'PC Desktop'),
+      description: document.getElementById('description').value,
+      transaction_id: document.getElementById('transaction-id').value || null,
+      product: document.getElementById('product').value || null,
+      amount: document.getElementById('amount').value || null,
+      attachments: document.getElementById('transaction-id').value ? [{ filename: 'receipt.png' }] : [],
       conversation: []
     };
 
@@ -221,21 +361,17 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('product').value = '';
       document.getElementById('amount').value = '';
       
-      // Reset details toggle if open
       const details = document.querySelector('.billing-details-summary');
       if (details) details.removeAttribute('open');
 
-      // Generate next ticket ID
       generateTicketId();
-
-      // Refresh list immediately
       fetchTickets();
     } catch (err) {
       alert(`Error submitting ticket: ${err.message}`);
     }
   });
 
-  // 6. Open History Modal and load ReAct trace logs
+  // 9. Quick view Modal Timeline Handlers
   async function openHistoryModal(ticketId) {
     modalTicketId.textContent = `Ticket ${ticketId} Execution Logs`;
     modalBody.innerHTML = `
@@ -250,9 +386,53 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const response = await fetch(`/api/tickets/${ticketId}/history`);
       if (!response.ok) throw new Error('History logs not found');
-      
       const history = await response.json();
-      renderHistory(history);
+      
+      if (!history || history.length === 0) {
+        modalBody.innerHTML = '<p class="empty-state">No execution logs found.</p>';
+        return;
+      }
+
+      modalBody.innerHTML = history.map(step => {
+        let icon = 'message-square';
+        if (step.role === 'system') icon = 'settings';
+        if (step.role === 'user') icon = 'user';
+        if (step.role === 'assistant') icon = 'bot';
+        if (step.role === 'tool') icon = 'wrench';
+
+        const showToolCalls = step.tool_calls && step.tool_calls.length > 0;
+
+        return `
+          <div class="trace-step ${step.role}">
+            <div class="trace-icon">
+              <i data-lucide="${icon}"></i>
+            </div>
+            <div class="trace-content">
+              <div class="trace-meta">
+                <span class="trace-role">${step.role}</span>
+                ${step.timestamp ? `<span class="trace-time">${new Date(step.timestamp).toLocaleTimeString()}</span>` : ''}
+              </div>
+              
+              ${step.content ? `<div class="trace-text">${step.content}</div>` : ''}
+
+              ${showToolCalls ? `
+                <div class="trace-tool-calls">
+                  ${step.tool_calls.map(tc => `
+                    <div class="tool-call-card">
+                      <div class="tool-call-name">🛠️ Called: ${tc.function.name}()</div>
+                      ${tc.function.arguments && tc.function.arguments !== '{}' ? `
+                        <pre class="tool-call-args">${JSON.stringify(JSON.parse(tc.function.arguments), null, 2)}</pre>
+                      ` : ''}
+                    </div>
+                  `).join('')}
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      lucide.createIcons();
     } catch (err) {
       modalBody.innerHTML = `
         <div class="empty-state" style="border:none; color: #ef4444;">
@@ -264,56 +444,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Render trace timeline
-  function renderHistory(history) {
-    if (!history || history.length === 0) {
-      modalBody.innerHTML = '<p class="empty-state">No execution logs found.</p>';
-      return;
-    }
-
-    modalBody.innerHTML = history.map(step => {
-      let icon = 'message-square';
-      if (step.role === 'system') icon = 'settings';
-      if (step.role === 'user') icon = 'user';
-      if (step.role === 'assistant') icon = 'bot';
-      if (step.role === 'tool') icon = 'wrench';
-
-      const showToolCalls = step.tool_calls && step.tool_calls.length > 0;
-
-      return `
-        <div class="trace-step ${step.role}">
-          <div class="trace-icon">
-            <i data-lucide="${icon}"></i>
-          </div>
-          <div class="trace-content">
-            <div class="trace-meta">
-              <span class="trace-role">${step.role}</span>
-              ${step.timestamp ? `<span class="trace-time">${new Date(step.timestamp).toLocaleTimeString()}</span>` : ''}
-            </div>
-            
-            ${step.content ? `<div class="trace-text">${step.content}</div>` : ''}
-
-            ${showToolCalls ? `
-              <div class="trace-tool-calls">
-                ${step.tool_calls.map(tc => `
-                  <div class="tool-call-card">
-                    <div class="tool-call-name">🛠️ Called: ${tc.function.name}()</div>
-                    ${tc.function.arguments && tc.function.arguments !== '{}' ? `
-                      <pre class="tool-call-args">${JSON.stringify(JSON.parse(tc.function.arguments), null, 2)}</pre>
-                    ` : ''}
-                  </div>
-                `).join('')}
-              </div>
-            ` : ''}
-          </div>
-        </div>
-      `;
-    }).join('');
-
-    lucide.createIcons();
-  }
-
-  // Close modal handlers
   closeModalBtn.addEventListener('click', () => {
     historyModal.classList.remove('active');
   });
