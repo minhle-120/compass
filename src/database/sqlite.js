@@ -233,6 +233,14 @@ export function getTicket(id) {
   return ticket;
 }
 
+export function deleteResolvedTicketRecord(id) {
+  const result = getDb().prepare(`
+    DELETE FROM tickets
+    WHERE id = ? AND status = 'completed' AND resolution_type = 'resolved'
+  `).run(id);
+  return result.changes === 1;
+}
+
 export function searchIncidents(query) {
   const database = getDb();
   const normalizedQuery = typeof query === 'string' ? query.trim().toLowerCase() : '';

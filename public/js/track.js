@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const ticketResolution = document.getElementById('ticket-resolution');
   const ticketIdDisplay = document.getElementById('ticket-id-display');
   const ticketCreated = document.getElementById('ticket-created');
+  const deleteTicketBtn = document.getElementById('delete-ticket-btn');
   const timeline = document.getElementById('conversation-timeline');
   
   const replyForm = document.getElementById('reply-form');
@@ -75,6 +76,9 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         ticketResolution.style.display = 'none';
       }
+
+      const canDelete = ticket.status === 'completed' && ticket.resolution_type === 'resolved';
+      deleteTicketBtn.style.display = canDelete ? 'inline-flex' : 'none';
 
       // Manage polling dynamically based on status
       const isActive = ['pending', 'running', 'awaiting_review'].includes(ticket.status);
@@ -197,6 +201,26 @@ document.addEventListener('DOMContentLoaded', () => {
     } finally {
       replyBtn.disabled = false;
       replyBtn.textContent = 'Send Reply';
+    }
+  });
+
+  deleteTicketBtn.addEventListener('click', async () => {
+    const confirmed = window.confirm(`Permanently delete resolved ticket ${ticketId}? This cannot be undone.`);
+    if (!confirmed) return;
+
+    deleteTicketBtn.disabled = true;
+    deleteTicketBtn.textContent = 'Deleting...';
+    try {
+      const res = await fetch(`/api/tickets/${encodeURIComponent(ticketId)}`, { method: 'DELETE' });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.error || 'Failed to delete ticket.');
+
+      if (pollInterval) clearInterval(pollInterval);
+      window.location.href = `/tickets.html?deleted=${encodeURIComponent(ticketId)}`;
+    } catch (error) {
+      window.alert(error.message);
+      deleteTicketBtn.disabled = false;
+      deleteTicketBtn.textContent = 'Delete ticket';
     }
   });
 

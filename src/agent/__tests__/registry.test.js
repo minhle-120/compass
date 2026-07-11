@@ -27,6 +27,7 @@ describe('tool registry outcomes', () => {
     expect(names).toContain('idle');
     expect(names).toContain('read_ticket');
     expect(names).toContain('flag_unknown_word');
+    expect(names).toContain('delete_resolved_ticket');
   });
 
   it('does not mark a workflow step complete when its handler fails', async () => {

@@ -1,8 +1,8 @@
 :root {
   --paper: #f2efe6;
   --paper-bright: #fbfaf5;
-  --ink: #112528;
-  --ink-soft: #486064;
+  --ink: #111111;
+  --ink-soft: #465154;
   --line: #b8b8aa;
   --signal: #ff5a36;
   --signal-dark: #c43118;
@@ -13,6 +13,9 @@
   --display: Baskerville, "Iowan Old Style", "Palatino Linotype", serif;
   --body: "Trebuchet MS", "Gill Sans", sans-serif;
   --mono: "Cascadia Mono", "Lucida Console", monospace;
+  --header-bg: var(--paper-bright);
+  --header-text: var(--ink);
+  --header-muted: var(--ink-soft);
 
   --color-bg: var(--paper-bright);
   --color-bg-subtle: var(--paper);
@@ -58,6 +61,9 @@
   --danger: #ff6050;
   --success: #8dd79f;
   --warning: #ffd36d;
+  --header-bg: #0b1719;
+  --header-text: #dbe3e2;
+  --header-muted: #aebdbb;
   --color-bg-inset: #102326;
   --color-border-subtle: rgba(219, 227, 226, .12);
   --color-success-bg: rgba(63, 160, 150, .2);
@@ -109,14 +115,18 @@ a {
 }
 
 .header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
   min-height: 76px;
   padding: 12px clamp(18px, 4vw, 56px);
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  flex-wrap: wrap;
   gap: 24px;
-  background: var(--ink);
-  color: var(--paper-bright);
+  background: var(--header-bg);
+  color: var(--header-text);
   border-bottom: 5px solid var(--signal);
 }
 
@@ -125,6 +135,14 @@ a {
   display: flex;
   align-items: center;
   gap: 16px;
+}
+
+.header-left {
+  flex-wrap: wrap;
+}
+
+.header-right {
+  flex-shrink: 0;
 }
 
 .header-logo {
@@ -164,7 +182,7 @@ a {
 }
 
 .header-nav a {
-  color: #d9e2df;
+  color: var(--header-text);
   font-family: var(--mono);
   font-size: 11px;
   font-weight: 700;
@@ -175,6 +193,11 @@ a {
 
 .header-nav a:hover,
 .header-nav a.active {
+  color: var(--signal-dark);
+}
+
+:root[data-theme="dark"] .header-nav a:hover,
+:root[data-theme="dark"] .header-nav a.active {
   color: var(--aqua);
 }
 
@@ -257,6 +280,18 @@ a {
 
 .btn-primary:hover {
   background: var(--signal-dark);
+}
+
+.btn-danger {
+  color: var(--danger);
+  background: var(--paper-bright);
+  border-color: var(--danger);
+}
+
+.btn-danger:hover {
+  color: #fff;
+  background: var(--danger);
+  box-shadow: 3px 3px 0 #58160e;
 }
 
 .btn-sm {

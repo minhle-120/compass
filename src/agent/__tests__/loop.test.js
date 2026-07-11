@@ -6,10 +6,15 @@ import { runAgentLoop } from '../loop.js';
 import { config } from '../../config.js';
 import { finalizeTicket } from '../../database/sqlite.js';
 import { executeTool, getOpenAITools } from '../registry.js';
+import { deleteResolvedTicket } from '../../services/ticketDeletion.js';
 
 // Mock sqlite database updates
 vi.mock('../../database/sqlite.js', () => ({
   finalizeTicket: vi.fn((ticketId, status) => ({ status, finalized: true }))
+}));
+
+vi.mock('../../services/ticketDeletion.js', () => ({
+  deleteResolvedTicket: vi.fn((ticketId) => ({ deleted: true, ticket_id: ticketId }))
 }));
 
 // Mock the tool registry to decouple loop tests from actual tool implementations
@@ -435,6 +440,62 @@ describe('Agent ReAct Loop', () => {
 
     await runAgentLoop(sessionContext);
     expect(sessionContext.flags.wasTicketRead).toBe(true);
+  });
+
+  it('deletes the current ticket after a deferred tool call and resolved idle outcome', async () => {
+    axios.post.mockResolvedValueOnce({
+      data: {
+        choices: [{
+          message: {
+            role: 'assistant',
+            tool_calls: [{
+              id: 'call_delete',
+              type: 'function',
+              function: {
+                name: 'delete_resolved_ticket',
+                arguments: JSON.stringify({ ticket_id: ticketId })
+              }
+            }]
+          }
+        }],
+        usage: { total_tokens: 100 }
+      }
+    }).mockResolvedValueOnce({
+      data: {
+        choices: [{
+          message: {
+            role: 'assistant',
+            tool_calls: [{
+              id: 'call_idle_after_delete',
+              type: 'function',
+              function: {
+                name: 'idle',
+                arguments: JSON.stringify({ resolution_type: 'resolved', reason: 'Done' })
+              }
+            }]
+          }
+        }],
+        usage: { total_tokens: 200 }
+      }
+    });
+
+    executeTool.mockImplementation(async (name, args, context) => {
+      if (name === 'delete_resolved_ticket') {
+        context.deleteAfterResolution = true;
+        return { ok: true, terminal: false, output: { deferred: true } };
+      }
+      context.resolutionType = args.resolution_type;
+      context.resolutionReason = args.reason;
+      return { ok: true, terminal: true, output: 'Agent idling' };
+    });
+
+    const result = await runAgentLoop(sessionContext);
+
+    expect(finalizeTicket).toHaveBeenCalledWith(ticketId, 'completed', 'resolved', 'Done', {
+      draftResponseMode: config.draftResponseMode
+    });
+    expect(deleteResolvedTicket).toHaveBeenCalledWith(ticketId);
+    expect(result).toMatchObject({ status: 'deleted', finalized: true });
   });
 
   it('should reconstruct unknown-word lookup misses from persisted tool results', async () => {
