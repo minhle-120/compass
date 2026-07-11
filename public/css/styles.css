@@ -504,6 +504,23 @@ select.form-control {
 .timeline-role.user { color: var(--color-link); }
 .timeline-role.assistant { color: var(--color-purple); }
 .timeline-role.tool { color: var(--color-success); }
+.timeline-role.thinking { color: var(--color-warning); }
+
+/* Model thinking block */
+.thinking-content {
+  font-size: 13px;
+  color: var(--color-warning);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--font-sans);
+  font-style: italic;
+  background: var(--color-warning-bg);
+  border-left: 3px solid var(--color-warning);
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  max-height: 200px;
+  overflow-y: auto;
+}
 
 .timeline-content {
   font-size: 13px;

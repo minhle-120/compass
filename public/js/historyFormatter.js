@@ -55,8 +55,9 @@ export function formatHumanHistory(messages) {
 
     if (role === 'assistant') {
       const entries = [];
+      // Model thinking: content present alongside tool calls (or standalone)
       if (message.content) {
-        entries.push({ role: 'assistant', label: 'Agent', content: message.content });
+        entries.push({ role: 'thinking', label: 'Model thinking', content: message.content, isThinking: true });
       }
       for (const call of message.tool_calls || []) {
         const toolName = call.function?.name || 'unknown_tool';

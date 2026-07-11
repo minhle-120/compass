@@ -262,6 +262,14 @@ document.addEventListener('DOMContentLoaded', () => {
       return '<div class="text-muted">No conversation history.</div>';
     }
     return '<ul class="timeline">' + formatHumanHistory(messages).map(entry => {
+      if (entry.isThinking) {
+        return `
+          <li class="timeline-item">
+            <div class="timeline-role thinking">${esc(entry.label)}</div>
+            <div class="thinking-content">${esc(entry.content)}</div>
+          </li>
+        `;
+      }
       return `
         <li class="timeline-item">
           <div class="timeline-role ${entry.role}">${esc(entry.label)}</div>
