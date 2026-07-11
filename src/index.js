@@ -82,6 +82,68 @@ app.get('/api/tickets/:id/history', (req, res) => {
   }
 });
 
+// API Endpoint to post a new player reply to an existing ticket
+app.post('/api/tickets/:id/messages', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { sender, message } = req.body;
+
+    if (!message) {
+      return res.status(400).json({ error: 'Message content is required' });
+    }
+
+    const ticket = getTicket(id);
+    if (!ticket) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+
+    // Append new message to conversation list
+    const conversation = ticket.conversation || [];
+    conversation.push({
+      sender: sender || 'player',
+      timestamp: new Date().toISOString(),
+      message
+    });
+
+    // Update SQLite record and reset status to pending so pool runs it
+    const database = getDb();
+    const now = new Date().toISOString();
+    const updateStmt = database.prepare(`
+      UPDATE tickets
+      SET conversation = ?, status = 'pending', updated_at = ?
+      WHERE id = ?
+    `);
+    updateStmt.run(JSON.stringify(conversation), now, id);
+
+    // Append wake-up prompt to history file on disk so the agent loop wakes up
+    const historyPath = join(config.historyDir, `${id}.json`);
+    if (existsSync(historyPath)) {
+      try {
+        const raw = readFileSync(historyPath, 'utf8');
+        const messages = JSON.parse(raw);
+        messages.push({
+          role: 'user',
+          content: 'The player has sent a new update. Call read_ticket to read the new message and update the ticket state.'
+        });
+        writeFileSync(historyPath, JSON.stringify(messages, null, 2));
+      } catch (err) {
+        logger.error(`Failed to append wake-up prompt to history file for ticket ${id}`, 'ExpressAPI', err);
+      }
+    }
+
+    logger.info(`Received player reply for ticket ${id}. Resetting status to pending.`, 'ExpressAPI');
+
+    // Trigger queue check in worker pool
+    pool.checkQueue();
+
+    res.json({ message: 'Reply added successfully', ticketId: id });
+  } catch (err) {
+    logger.error(`Failed to process player reply for ticket ${req.params.id}`, 'ExpressAPI', err);
+    res.status(500).json({ error: 'Failed to process player reply' });
+  }
+});
+
+
 
 // API Endpoint to submit a new ticket
 app.post('/api/tickets', (req, res) => {
