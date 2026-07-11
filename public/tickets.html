@@ -8,38 +8,40 @@
   <style>
     .tabs {
       display: flex;
-      border-bottom: 1px solid var(--color-border);
-      margin-bottom: 16px;
+      border-bottom: 1px solid var(--ink);
+      margin-bottom: 18px;
       gap: 16px;
     }
     .tab {
-      padding: 8px 16px;
+      padding: 8px 0;
       cursor: pointer;
-      font-size: 14px;
+      font-family: var(--mono);
+      font-size: 11px;
       font-weight: 500;
-      color: var(--color-fg-muted);
-      border-bottom: 2px solid transparent;
+      color: var(--ink-soft);
+      border-bottom: 4px solid transparent;
       margin-bottom: -1px;
+      text-transform: uppercase;
     }
     .tab.active {
-      color: var(--color-fg-default);
-      border-bottom-color: #fd8c73;
+      color: var(--ink);
+      border-bottom-color: var(--signal);
     }
     .ticket-list {
       display: flex;
       flex-direction: column;
       gap: 0;
-      border: 1px solid var(--color-border);
-      border-radius: 6px;
+      border: 1px solid var(--ink);
       overflow: hidden;
-      background-color: var(--color-bg);
+      background-color: var(--paper-bright);
+      box-shadow: 7px 7px 0 var(--ink);
     }
     .ticket-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
       padding: 12px 16px;
-      border-bottom: 1px solid var(--color-border);
+      border-bottom: 1px solid var(--line);
       text-decoration: none;
       color: inherit;
       transition: background-color 0.15s ease;
@@ -48,7 +50,7 @@
       border-bottom: none;
     }
     .ticket-row:hover {
-      background-color: var(--color-bg-subtle);
+      background-color: rgba(185, 229, 220, .35);
     }
     .ticket-info {
       display: flex;
@@ -58,31 +60,13 @@
     .ticket-title {
       font-size: 14px;
       font-weight: 600;
-      color: var(--color-fg-default);
+      color: var(--ink);
     }
     .ticket-meta {
       font-size: 12px;
-      color: var(--color-fg-muted);
-      font-family: var(--font-sans);
+      color: var(--ink-soft);
+      font-family: var(--mono);
     }
-    .status-badge {
-      display: inline-flex;
-      align-items: center;
-      font-size: 11px;
-      font-weight: 500;
-      padding: 2px 8px;
-      border-radius: 12px;
-      text-transform: capitalize;
-    }
-    .status-pending { background-color: var(--color-bg-subtle); color: var(--color-fg-muted); border: 1px solid var(--color-border); }
-    .status-running { background-color: #ddf4ff; color: #0969da; border: 1px solid rgba(9, 105, 218, 0.2); }
-    .status-awaiting_review { background-color: #fff8c5; color: #9a6700; border: 1px solid rgba(154, 103, 0, 0.2); }
-    .status-completed { background-color: #dafbe1; color: #1a7f37; border: 1px solid rgba(26, 127, 55, 0.2); }
-    .status-escalated { background-color: #fbe5ff; color: #8250df; border: 1px solid rgba(130, 80, 223, 0.2); }
-    .status-failed { background-color: #ffebe9; color: #cf222e; border: 1px solid rgba(207, 34, 46, 0.2); }
-    .status-resolved { background-color: #dafbe1; color: #1a7f37; border: 1px solid rgba(26, 127, 55, 0.2); }
-    .status-needs_clarification { background-color: #fff8c5; color: #9a6700; border: 1px solid rgba(154, 103, 0, 0.2); }
-    .status-rejected { background-color: #ffebe9; color: #cf222e; border: 1px solid rgba(207, 34, 46, 0.2); }
   </style>
   <script src="/js/theme.js"></script>
 </head>
@@ -95,11 +79,12 @@
         <a href="/tickets.html" class="active">Browse Tickets</a>
         <a href="/dashboard.html">Dashboard</a>
         <a href="/wiki">Wiki</a>
+        <a href="/flags">Flagged Words</a>
       </nav>
     </div>
     <div class="header-right">
       <button id="theme-toggle" class="btn btn-sm" aria-label="Toggle theme" style="padding: 4px 8px; line-height: 1;">
-        <span class="theme-toggle-icon">🌙</span>
+        <span class="theme-toggle-icon">Dark</span>
       </button>
     </div>
   </header>

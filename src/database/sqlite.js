@@ -91,22 +91,7 @@ export function initDb() {
       ON problems(status, category, description_signature);
   `);
 
-<<<<<<< Updated upstream
-  // Keep existing databases compatible when new workflow columns are added.
-  const ticketColumns = new Set(
-    db.prepare('PRAGMA table_info(tickets)').all().map((column) => column.name)
-  );
-  const missingTicketColumns = [
-    ['workflow_revision', 'INTEGER NOT NULL DEFAULT 0'],
-    ['resolution_type', 'TEXT'],
-    ['resolution_reason', 'TEXT'],
-    ['draft_status', 'TEXT']
-  ];
-  for (const [name, definition] of missingTicketColumns) {
-    if (!ticketColumns.has(name)) {
-      db.exec(`ALTER TABLE tickets ADD COLUMN ${name} ${definition}`);
-    }
-  }
+  migrateTicketSchema(db);
 
   const incidentCount = db
     .prepare('SELECT COUNT(*) AS count FROM incident')
@@ -180,10 +165,6 @@ export function initDb() {
 
     insertMany(incidents);
   }
-=======
-  migrateTicketSchema(db);
->>>>>>> Stashed changes
-
   logger.info(`SQLite database initialized at ${dbPath}`);
   return db;
 }

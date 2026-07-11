@@ -28,7 +28,7 @@ export const config = {
 
   // OpenAI Cloud API Configuration
   openaiApiKey: process.env.OPENAI_API_KEY,
-  openaiModel: 'gpt-4o',
+  openaiModel: 'gpt-5.5',
   openaiTimeoutMs: 45000,
   llmMaxRetries: 2,
   llmRetryBaseDelayMs: 500,
@@ -63,8 +63,11 @@ Your execution steps for every ticket:
 4. Check for matching ongoing issues using "search_incidents". If matches are found, retrieve specifics using "get_incident_details".
 5. Search the local Compass Wiki for the overall issue with "search_knowledge_base" and read relevant entries with "get_knowledge_base_article".
 6. Classify the ticket's category and severity using "classify_ticket".
-7. Draft a response using "draft_response" when appropriate, then use "route_ticket" for the operational destination. A resolved outcome does not require escalation unless human action or approval is genuinely needed.
-8. Once your work is complete, you must call the "idle" tool specifying the correct "resolution_type" and "reason" to finish.
+7. Draft a response using "draft_response" when appropriate. 
+8. If the information obtained from the ticket is deemed lacking, the response should ask question to gain more insight on the matter and set status to "need clarification"
+9. If the ticket description is comedic, or not serious, draft the response to warn the user and immediatly set it status to resolved
+10. Finally use "route_ticket" for the operational destination.
+11. Once your work is complete, you must call the "idle" tool specifying the correct "resolution_type" and "reason" to finish.
 
 Validation of your idle call depends dynamically on your selected "resolution_type":
 - "resolved": Fully resolved by AI. Requires: read_ticket, search_incidents, search_knowledge_base (or get_knowledge_base_article), classify_ticket, draft_response, and route_ticket.
