@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
   
   const ticketTitle = document.getElementById('ticket-title');
   const ticketStatus = document.getElementById('ticket-status');
+  const ticketResolution = document.getElementById('ticket-resolution');
   const ticketIdDisplay = document.getElementById('ticket-id-display');
   const ticketCreated = document.getElementById('ticket-created');
   const timeline = document.getElementById('conversation-timeline');
@@ -58,6 +59,27 @@ document.addEventListener('DOMContentLoaded', () => {
       // Update Status Badge
       ticketStatus.textContent = ticket.status;
       ticketStatus.className = `status-badge status-${ticket.status}`;
+
+      // Update Resolution Badge (idle conclusion)
+      if (ticket.resolution_type) {
+        const labelMap = {
+          resolved:           '✓ Resolved',
+          needs_clarification: '? Needs Clarification',
+          escalated:          '↑ Escalated',
+          rejected:           '✗ Rejected'
+        };
+        ticketResolution.textContent = labelMap[ticket.resolution_type] || ticket.resolution_type;
+        ticketResolution.className = `status-badge status-${ticket.resolution_type}`;
+        ticketResolution.style.display = 'inline-flex';
+      } else {
+        ticketResolution.style.display = 'none';
+      }
+
+      // Stop polling once ticket has a terminal status
+      if (ticket.status !== 'pending' && ticket.status !== 'running' && pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
 
       // Update date format
       const createdDate = new Date(ticket.created_at || Date.now());

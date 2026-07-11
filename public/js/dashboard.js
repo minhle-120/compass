@@ -109,17 +109,21 @@ document.addEventListener('DOMContentLoaded', () => {
       const tickets = await res.json();
 
       if (tickets.length === 0) {
-        ticketTbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><h3>No tickets yet</h3><p>Submit a ticket to get started.</p></div></td></tr>';
+        ticketTbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><h3>No tickets yet</h3><p>Submit a ticket to get started.</p></div></td></tr>';
         return;
       }
 
       ticketTbody.innerHTML = tickets.map(t => {
         const categories = Array.isArray(t.categories) ? t.categories.join(', ') : (t.categories || '–');
+        const resolutionBadge = t.resolution_type
+          ? `<span class="label label-${t.resolution_type}">${t.resolution_type}</span>`
+          : '–';
         return `
           <tr>
             <td><a class="ticket-id" data-id="${esc(t.id)}">${esc(t.id)}</a></td>
             <td class="ticket-subject">${esc(truncate(t.subject, 60))}</td>
             <td>${statusLabel(t.status)}</td>
+            <td>${resolutionBadge}</td>
             <td>${esc(t.routing_destination || '–')}</td>
             <td class="text-muted text-sm">${esc(truncate(categories, 30))}</td>
             <td class="ticket-time">${timeAgo(t.created_at)}</td>

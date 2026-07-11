@@ -53,6 +53,16 @@ document.addEventListener('DOMContentLoaded', () => {
       row.className = 'ticket-row';
       row.href = `/track.html?id=${encodeURIComponent(ticket.id)}`;
 
+      // User-friendly status labels
+      const statusMap = {
+        pending:    { label: 'In Queue',    cls: 'status-pending' },
+        running:    { label: 'Processing',  cls: 'status-running' },
+        escalated:  { label: 'Escalated',   cls: 'status-escalated' },
+        completed:  { label: 'Closed',      cls: 'status-completed' },
+        failed:     { label: 'Closed',      cls: 'status-completed' },
+      };
+      const s = statusMap[ticket.status] || { label: ticket.status, cls: `status-${ticket.status}` };
+
       row.innerHTML = `
         <div class="ticket-info">
           <div class="ticket-title">${escapeHTML(ticket.subject || 'No Subject')}</div>
@@ -63,7 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
         </div>
         <div>
-          <span class="status-badge status-${ticket.status}">${ticket.status}</span>
+          <span class="status-badge ${s.cls}">${s.label}</span>
         </div>
       `;
       container.appendChild(row);

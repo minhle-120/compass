@@ -89,6 +89,9 @@
     .status-completed { background-color: #dafbe1; color: #1a7f37; border: 1px solid rgba(26, 127, 55, 0.2); }
     .status-escalated { background-color: #fbe5ff; color: #8250df; border: 1px solid rgba(130, 80, 223, 0.2); }
     .status-failed { background-color: #ffebe9; color: #cf222e; border: 1px solid rgba(207, 34, 46, 0.2); }
+    .status-resolved { background-color: #dafbe1; color: #1a7f37; border: 1px solid rgba(26, 127, 55, 0.2); }
+    .status-needs_clarification { background-color: #fff8c5; color: #9a6700; border: 1px solid rgba(154, 103, 0, 0.2); }
+    .status-rejected { background-color: #ffebe9; color: #cf222e; border: 1px solid rgba(207, 34, 46, 0.2); }
   </style>
 </head>
 <body>
@@ -134,7 +137,10 @@
       <div style="border-bottom: 1px solid var(--color-border); padding-bottom: 16px; margin-bottom: 24px;">
         <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
           <h1 id="ticket-title" style="font-size: 24px; font-weight: 600;">Ticket Subject</h1>
-          <span id="ticket-status" class="status-badge">pending</span>
+          <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+            <span id="ticket-resolution" class="status-badge" style="display: none;"></span>
+            <span id="ticket-status" class="status-badge">pending</span>
+          </div>
         </div>
         <div style="margin-top: 8px; color: var(--color-fg-muted); font-size: 14px;">
           Ticket ID: <strong id="ticket-id-display" style="font-family: var(--font-mono); color: var(--color-fg-default);">T-1234</strong>

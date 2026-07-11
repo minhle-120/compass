@@ -45,7 +45,8 @@ export function initDb() {
       routing_destination TEXT,
       routing_reason TEXT,
       draft_response TEXT,
-      error_message TEXT
+      error_message TEXT,
+      resolution_type TEXT
     );
 
     CREATE TABLE IF NOT EXISTS kb_articles (
@@ -164,6 +165,17 @@ export function updateTicketDraft(id, draftResponse) {
   `);
   const now = new Date().toISOString();
   stmt.run(draftResponse, now, id);
+}
+
+export function updateTicketResolution(id, resolutionType, resolutionReason) {
+  const database = getDb();
+  const stmt = database.prepare(`
+    UPDATE tickets
+    SET resolution_type = ?, rationale = ?, updated_at = ?
+    WHERE id = ?
+  `);
+  const now = new Date().toISOString();
+  stmt.run(resolutionType, resolutionReason, now, id);
 }
 
 export function insertTicket(ticket) {

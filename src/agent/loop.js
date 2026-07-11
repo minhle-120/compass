@@ -4,7 +4,7 @@ import { join, dirname } from 'path';
 import axios from 'axios';
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
-import { updateTicketStatus } from '../database/sqlite.js';
+import { updateTicketStatus, updateTicketResolution } from '../database/sqlite.js';
 import { executeTool, getOpenAITools } from './registry.js';
 import { parentPort } from 'worker_threads';
 
@@ -227,6 +227,12 @@ export async function runAgentLoop(sessionContext) {
         if (name === 'idle' && !toolOutput.includes('Validation failed')) {
           logger.info(`Idle tool execution validated. Exiting agent loop.`, `Ticket-${ticketId}`);
           loopActive = false;
+          
+          try {
+            updateTicketResolution(ticketId, sessionContext.resolutionType, sessionContext.resolutionReason);
+          } catch (resErr) {
+            logger.error(`Failed to save ticket resolution: ${resErr.message}`, `Ticket-${ticketId}`);
+          }
           
           // Determine final status based on resolution outcome
           if (sessionContext.resolutionType === 'escalated') {
