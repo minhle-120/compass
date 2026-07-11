@@ -1,4 +1,5 @@
 // src/tools/route_ticket.js
+import { updateTicketRouting } from '../database/sqlite.js';
 
 export const schema = {
   type: 'function',
@@ -24,5 +25,14 @@ export const schema = {
 };
 
 export async function handler(args, sessionContext) {
-  return 'Ticket routing stub';
+  const { destination, reason } = args || {};
+  if (typeof destination !== 'string' || !destination.trim()) {
+    throw new TypeError('destination must be a non-empty string');
+  }
+  if (typeof reason !== 'string' || !reason.trim()) {
+    throw new TypeError('reason must be a non-empty string');
+  }
+
+  updateTicketRouting(sessionContext.ticketId, destination, reason.trim());
+  return JSON.stringify({ destination, reason: reason.trim() });
 }

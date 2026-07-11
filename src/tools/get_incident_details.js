@@ -5,13 +5,13 @@ export const schema = {
   type: 'function',
   function: {
     name: 'get_incident_details',
-    description: 'Get full details of a specific incident by its ID, including its summary, category, severity, keywords, region, and platform.',
+    description: 'Get the full details of a known incident using its incident ID.',
     parameters: {
       type: 'object',
       properties: {
         incident_id: {
           type: 'string',
-          description: 'The ID of the incident to retrieve details for.'
+          description: 'The incident ID, for example INC-001.'
         }
       },
       required: ['incident_id']
@@ -30,5 +30,8 @@ export async function handler(args, sessionContext) {
     return JSON.stringify({ error: `Incident "${incidentId}" not found`, incident: null });
   }
 
+  if (sessionContext) {
+    sessionContext.matchedIncident = incident;
+  }
   return JSON.stringify({ incident });
 }

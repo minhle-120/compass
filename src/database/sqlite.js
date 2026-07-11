@@ -94,6 +94,79 @@ export function initDb() {
     );
   `);
 
+  const incidentCount = db
+    .prepare('SELECT COUNT(*) AS count FROM incident')
+    .get().count;
+
+  if (incidentCount === 0) {
+    const insertIncident = db.prepare(`
+      INSERT INTO incident (
+        id, title, summary, category, severity, keywords, region, platform
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const incidents = [
+      [
+        'INC-001',
+        'Players Unable to Log In',
+        'Players receive an authentication error when attempting to log in during peak hours.',
+        'Authentication',
+        'critical',
+        'login, authentication, error, account access',
+        'Southeast Asia',
+        'PC'
+      ],
+      [
+        'INC-002',
+        'Missing Purchased Items',
+        'Some players completed purchases but the purchased items did not appear in their inventory.',
+        'Payment',
+        'high',
+        'purchase, payment, missing item, inventory',
+        'Global',
+        'Mobile'
+      ],
+      [
+        'INC-003',
+        'High Matchmaking Latency',
+        'Players experience long matchmaking times and increased latency when joining ranked matches.',
+        'Performance',
+        'medium',
+        'matchmaking, latency, lag, ranked match',
+        'Asia',
+        'PC'
+      ],
+      [
+        'INC-004',
+        'Game Crashes After Latest Update',
+        'The game crashes on startup for some Android devices after installing the latest update.',
+        'Crash',
+        'high',
+        'crash, startup, update, android',
+        'Global',
+        'Android'
+      ],
+      [
+        'INC-005',
+        'Incorrect Ranked Rewards',
+        'Some players received rewards for the wrong rank after the competitive season ended.',
+        'Rewards',
+        'medium',
+        'ranked, rewards, season, incorrect reward',
+        'Europe',
+        'PC'
+      ]
+    ];
+
+    const insertMany = db.transaction((rows) => {
+      for (const incident of rows) {
+        insertIncident.run(...incident);
+      }
+    });
+
+    insertMany(incidents);
+  }
+
   logger.info(`SQLite database initialized at ${dbPath}`);
   return db;
 }
@@ -145,28 +218,87 @@ export function getTicket(id) {
 
 export function searchIncidents(query) {
   const database = getDb();
-  const normalizedQuery = typeof query === 'string' ? query.trim() : '';
+  const normalizedQuery = typeof query === 'string' ? query.trim().toLowerCase() : '';
   if (!normalizedQuery) return [];
 
-  const stmt = database.prepare(`
+  const terms = normalizedQuery.split(/\s+/).filter(Boolean);
+  const incidents = database.prepare(`
     SELECT id, title, summary, category, severity, keywords, region, platform
     FROM incident
-    WHERE instr(lower(title), lower(@query)) > 0
-       OR instr(lower(summary), lower(@query)) > 0
-       OR instr(lower(category), lower(@query)) > 0
-       OR instr(lower(severity), lower(@query)) > 0
-       OR instr(lower(COALESCE(keywords, '')), lower(@query)) > 0
-       OR instr(lower(COALESCE(region, '')), lower(@query)) > 0
-       OR instr(lower(COALESCE(platform, '')), lower(@query)) > 0
-    ORDER BY id ASC
-  `);
-  return stmt.all({ query: normalizedQuery });
+  `).all();
+
+  return incidents
+    .map((incident) => {
+      const searchableText = [
+        incident.title,
+        incident.summary,
+        incident.category,
+        incident.severity,
+        incident.keywords,
+        incident.region,
+        incident.platform
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      const score = terms.reduce(
+        (total, term) => total + (searchableText.includes(term) ? 1 : 0),
+        0
+      );
+
+      return { ...incident, score };
+    })
+    .filter((incident) => incident.score > 0)
+    .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))
+    .slice(0, 5);
 }
 
 export function getIncident(id) {
   const database = getDb();
-  const stmt = database.prepare(`SELECT * FROM incident WHERE id = ?`);
+  const stmt = database.prepare(`SELECT * FROM incident WHERE lower(id) = lower(?)`);
   return stmt.get(id);
+}
+
+export function searchKnowledgeBase(query) {
+  const database = getDb();
+  const normalizedQuery = typeof query === 'string' ? query.trim().toLowerCase() : '';
+  if (!normalizedQuery) return [];
+
+  const terms = normalizedQuery.split(/\s+/).filter(Boolean);
+  const articles = database.prepare(`
+    SELECT id, title, status, platforms, game_versions, updated_at, summary, excerpt
+    FROM kb_articles
+  `).all();
+
+  return articles
+    .map((article) => {
+      const searchableText = [
+        article.title,
+        article.summary,
+        article.excerpt,
+        article.platforms,
+        article.game_versions
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      const score = terms.reduce(
+        (total, term) => total + (searchableText.includes(term) ? 1 : 0),
+        0
+      );
+      return { ...article, score };
+    })
+    .filter((article) => article.score > 0)
+    .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))
+    .slice(0, 5);
+}
+
+export function getKnowledgeBaseArticle(id) {
+  const database = getDb();
+  return database.prepare(`
+    SELECT * FROM kb_articles WHERE lower(id) = lower(?)
+  `).get(id);
 }
 
 export function updateTicketStatus(id, status, errorMessage = null) {

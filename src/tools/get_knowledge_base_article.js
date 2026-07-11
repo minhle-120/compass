@@ -1,4 +1,5 @@
 // src/tools/get_knowledge_base_article.js
+import { getKnowledgeBaseArticle } from '../database/sqlite.js';
 
 export const schema = {
   type: 'function',
@@ -19,5 +20,14 @@ export const schema = {
 };
 
 export async function handler(args, sessionContext) {
-  return 'Get knowledge base article stub';
+  const articleId = typeof args?.article_id === 'string' ? args.article_id.trim() : '';
+  if (!articleId) {
+    throw new TypeError('article_id must be a non-empty string');
+  }
+
+  const article = getKnowledgeBaseArticle(articleId);
+  if (!article) {
+    return JSON.stringify({ error: `Knowledge base article "${articleId}" not found`, article: null });
+  }
+  return JSON.stringify({ article });
 }

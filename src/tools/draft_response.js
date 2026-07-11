@@ -1,4 +1,5 @@
 // src/tools/draft_response.js
+import { updateTicketDraft } from '../database/sqlite.js';
 
 export const schema = {
   type: 'function',
@@ -19,5 +20,11 @@ export const schema = {
 };
 
 export async function handler(args, sessionContext) {
-  return 'Ticket draft response stub';
+  const response = typeof args?.response === 'string' ? args.response.trim() : '';
+  if (!response) {
+    throw new TypeError('response must be a non-empty string');
+  }
+
+  updateTicketDraft(sessionContext.ticketId, response);
+  return JSON.stringify({ response });
 }

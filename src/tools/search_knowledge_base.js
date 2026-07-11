@@ -1,4 +1,5 @@
 // src/tools/search_knowledge_base.js
+import { searchKnowledgeBase } from '../database/sqlite.js';
 
 export const schema = {
   type: 'function',
@@ -19,5 +20,9 @@ export const schema = {
 };
 
 export async function handler(args, sessionContext) {
-  return 'Search knowledge base stub';
+  const query = typeof args?.query === 'string' ? args.query.trim() : '';
+  if (!query) {
+    throw new TypeError('query must be a non-empty string');
+  }
+  return JSON.stringify({ articles: searchKnowledgeBase(query) });
 }
