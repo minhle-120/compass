@@ -59,7 +59,42 @@ describe('incident service', () => {
     const result = searchIncidents('SIGN-IN');
 
     expect(result.incidents).toHaveLength(1);
-    expect(result.incidents[0]).toMatchObject({ id: 'INC-001', severity: 'critical' });
+    expect(result.incidents[0]).toMatchObject({
+      id: 'INC-001',
+      severity: 'critical',
+      matched_terms: ['sign-in'],
+      source: 'incident_service'
+    });
+    expect(result.incidents[0].score).toBeGreaterThan(0);
+  });
+
+  it('ranks stronger field matches first and respects the result limit', () => {
+    upsertIncident({
+      ...storeIncident,
+      id: 'INC-003',
+      title: 'Background service issue',
+      keywords: ['login'],
+      updated_at: '2026-07-11T10:00:00.000Z'
+    });
+
+    const result = searchIncidents('login', { limit: 1 });
+    expect(result.incidents).toHaveLength(1);
+    expect(result.incidents[0].id).toBe('INC-001');
+  });
+
+  it('filters by platform, region, and status case-insensitively', () => {
+    expect(searchIncidents('purchase store', {
+      platform: 'mobile',
+      region: 'eu',
+      status: 'RESOLVED'
+    }).incidents.map((incident) => incident.id)).toEqual(['INC-002']);
+
+    expect(searchIncidents('purchase store', { platform: 'PC' }).incidents).toEqual([]);
+  });
+
+  it('validates malformed optional filters', () => {
+    expect(() => searchIncidents('login', { platform: [] }))
+      .toThrow('platform must be a non-empty string when provided');
   });
 
   it('matches multiple terms across different fields', () => {
@@ -93,7 +128,12 @@ describe('incident service', () => {
   });
 
   it('exposes the service through thin tool adapters', async () => {
-    const searchResult = await searchIncidentTool({ query: 'Mobile EU' }, {});
+    const searchResult = await searchIncidentTool({
+      query: 'purchase store',
+      platform: 'Mobile',
+      region: 'EU',
+      status: 'resolved'
+    }, {});
     const detailResult = await getIncidentDetailsTool({ incident_id: 'INC-002' }, {});
 
     expect(searchResult.incidents.map((incident) => incident.id)).toEqual(['INC-002']);

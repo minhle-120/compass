@@ -1,5 +1,4 @@
 // src/tools/get_incident_details.js
-import { getIncident } from '../database/sqlite.js';
 import { getIncidentDetails } from '../../services/incident/incidentService.js';
 
 export const schema = {
@@ -26,8 +25,7 @@ export async function handler(args, sessionContext) {
     throw new TypeError('incident_id must be a non-empty string');
   }
 
-  let incident = getIncidentDetails(incidentId).incident;
-  if (!incident) incident = getIncident(incidentId);
+  const incident = getIncidentDetails(incidentId).incident;
   if (!incident) {
     return { error: `Incident "${incidentId}" not found`, incident: null };
   }

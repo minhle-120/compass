@@ -8,12 +8,43 @@ const SEARCH_FIELDS = [
 
 const ARRAY_FIELDS = ['platforms', 'regions', 'services', 'keywords'];
 
+const STOP_WORDS = new Set([
+  'a', 'an', 'and', 'are', 'for', 'game', 'i', 'in', 'is', 'it', 'my',
+  'of', 'on', 'or', 'player', 'players', 'the', 'to', 'with'
+]);
+
+const SEARCH_WEIGHTS = {
+  id: 12,
+  title: 6,
+  keywords: 5,
+  symptoms: 4,
+  category: 3,
+  services: 3,
+  platforms: 3,
+  regions: 3,
+  summary: 2,
+  impact: 1,
+  guidance: 1,
+  workaround: 1,
+  resolution: 1,
+  status: 1,
+  severity: 1
+};
+
 function requireText(value, fieldName) {
   const normalized = typeof value === 'string' ? value.trim() : '';
   if (!normalized) {
     throw new TypeError(`${fieldName} must be a non-empty string`);
   }
   return normalized;
+}
+
+function optionalFilter(value, fieldName) {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new TypeError(`${fieldName} must be a non-empty string when provided`);
+  }
+  return value.trim().toLowerCase();
 }
 
 function parseArray(value) {
@@ -39,31 +70,69 @@ function mapIncident(row) {
   return incident;
 }
 
-export function searchIncidents(query, { limit = 10 } = {}) {
+export function searchIncidents(query, {
+  limit = 10,
+  platform,
+  region,
+  status
+} = {}) {
   const normalizedQuery = requireText(query, 'query');
-  const terms = [...new Set(normalizedQuery.toLowerCase().match(/[\p{L}\p{N}_-]+/gu) || [])];
-  if (terms.length === 0) {
+  const platformFilter = optionalFilter(platform, 'platform');
+  const regionFilter = optionalFilter(region, 'region');
+  const statusFilter = optionalFilter(status, 'status');
+  const extractedTerms = [...new Set(normalizedQuery.toLowerCase().match(/[\p{L}\p{N}_-]+/gu) || [])];
+  if (extractedTerms.length === 0) {
     throw new TypeError('query must contain searchable letters or numbers');
   }
-
-  const fieldMatch = SEARCH_FIELDS
-    .map((field) => `instr(lower(COALESCE(${field}, '')), ?) > 0`)
-    .join(' OR ');
-  const where = terms.map(() => `(${fieldMatch})`).join(' AND ');
-  const parameters = terms.flatMap((term) => SEARCH_FIELDS.map(() => term));
+  const meaningfulTerms = extractedTerms.filter((term) => !STOP_WORDS.has(term));
+  const terms = meaningfulTerms.length > 0 ? meaningfulTerms : extractedTerms;
   const safeLimit = Math.min(Math.max(Number.parseInt(limit, 10) || 10, 1), 50);
+  const minimumMatches = Math.max(1, Math.ceil(terms.length * 0.6));
 
-  const rows = getIncidentDb().prepare(`
-    SELECT * FROM incidents
-    WHERE ${where}
-    ORDER BY
-      CASE status WHEN 'active' THEN 0 WHEN 'monitoring' THEN 1 ELSE 2 END,
-      updated_at DESC,
-      id ASC
-    LIMIT ?
-  `).all(...parameters, safeLimit);
+  const ranked = getIncidentDb().prepare('SELECT * FROM incidents').all()
+    .map(mapIncident)
+    .filter((incident) => !platformFilter
+      || incident.platforms.some((value) => value.toLowerCase() === platformFilter))
+    .filter((incident) => !regionFilter
+      || incident.regions.some((value) => value.toLowerCase() === regionFilter))
+    .filter((incident) => !statusFilter
+      || String(incident.status).toLowerCase() === statusFilter)
+    .map((incident) => {
+      const matchedTerms = [];
+      let score = 0;
+      for (const term of terms) {
+        let bestWeight = 0;
+        for (const field of SEARCH_FIELDS) {
+          const value = Array.isArray(incident[field])
+            ? incident[field].join(' ')
+            : String(incident[field] || '');
+          if (value.toLowerCase().includes(term)) {
+            bestWeight = Math.max(bestWeight, SEARCH_WEIGHTS[field] || 1);
+          }
+        }
+        if (bestWeight > 0) {
+          matchedTerms.push(term);
+          score += bestWeight;
+        }
+      }
+      return { ...incident, score, matched_terms: matchedTerms, source: 'incident_service' };
+    })
+    .filter((incident) => incident.matched_terms.length >= minimumMatches)
+    .sort((a, b) =>
+      b.score - a.score
+      || statusRank(a.status) - statusRank(b.status)
+      || String(b.updated_at).localeCompare(String(a.updated_at))
+      || a.id.localeCompare(b.id)
+    )
+    .slice(0, safeLimit);
 
-  return { incidents: rows.map(mapIncident) };
+  return { incidents: ranked };
+}
+
+function statusRank(status) {
+  if (status === 'active') return 0;
+  if (status === 'monitoring') return 1;
+  return 2;
 }
 
 export function getIncidentDetails(incidentId) {
