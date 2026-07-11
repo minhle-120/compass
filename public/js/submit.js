@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const submitBtn = document.getElementById('submit-btn');
 
   function showFlash(message, type) {
-    flash.textContent = message;
+    flash.innerHTML = message;
     flash.className = `flash flash-${type}`;
     flash.style.display = 'block';
     setTimeout(() => { flash.style.display = 'none'; }, 5000);
@@ -16,19 +16,8 @@ document.addEventListener('DOMContentLoaded', () => {
     submitBtn.textContent = 'Submitting…';
 
     const payload = {
-      id: document.getElementById('ticket-id').value.trim(),
       subject: document.getElementById('ticket-subject').value.trim(),
-      description: document.getElementById('ticket-description').value.trim(),
-      requester_id: document.getElementById('ticket-requester').value.trim() || null,
-      account_id: document.getElementById('ticket-account').value.trim() || null,
-      platform: document.getElementById('ticket-platform').value || null,
-      region: document.getElementById('ticket-region').value || null,
-      device: document.getElementById('ticket-device').value.trim() || null,
-      game_version: document.getElementById('ticket-version').value.trim() || null,
-      locale: document.getElementById('ticket-locale').value.trim() || null,
-      transaction_id: document.getElementById('ticket-txn').value.trim() || null,
-      product: document.getElementById('ticket-product').value.trim() || null,
-      amount: document.getElementById('ticket-amount').value.trim() || null
+      description: document.getElementById('ticket-description').value.trim()
     };
 
     try {
@@ -41,7 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await res.json();
 
       if (res.ok) {
-        showFlash(`Ticket ${data.ticketId} submitted successfully.`, 'success');
+        showFlash(`Ticket ${data.ticketId} submitted successfully. <a href="/track.html?id=${encodeURIComponent(data.ticketId)}" style="color: inherit; text-decoration: underline; font-weight: 600;">Track conversation here</a>`, 'success');
         form.reset();
       } else {
         showFlash(data.error || 'Submission failed.', 'error');

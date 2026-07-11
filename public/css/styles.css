@@ -294,6 +294,21 @@ select.form-control {
   color: var(--color-danger);
 }
 
+.label-resolved {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.label-needs_clarification {
+  background: #fff8c5;
+  color: #9a6700;
+}
+
+.label-rejected {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
 /* Stat counters */
 .stats-grid {
   display: grid;
