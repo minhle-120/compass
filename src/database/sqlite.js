@@ -48,25 +48,21 @@ export function initDb() {
       error_message TEXT
     );
 
-    CREATE TABLE IF NOT EXISTS incidents (
+    CREATE TABLE IF NOT EXISTS incident (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
-      status TEXT NOT NULL,
-      severity TEXT NOT NULL,
-      started_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      platforms TEXT, /* JSON array of strings */
-      regions TEXT, /* JSON array of strings */
-      services TEXT, /* JSON array of strings */
-      symptoms TEXT NOT NULL,
       summary TEXT NOT NULL,
-      impact TEXT,
-      understanding TEXT,
-      guidance TEXT,
-      workaround TEXT,
-      resolution TEXT,
-      approved_message TEXT
+      category TEXT NOT NULL,
+      severity TEXT NOT NULL,
+      keywords TEXT,
+      region TEXT,
+      platform TEXT
     );
+
+    CREATE INDEX IF NOT EXISTS idx_incident_category ON incident(category);
+    CREATE INDEX IF NOT EXISTS idx_incident_severity ON incident(severity);
+    CREATE INDEX IF NOT EXISTS idx_incident_region ON incident(region);
+    CREATE INDEX IF NOT EXISTS idx_incident_platform ON incident(platform);
 
     CREATE TABLE IF NOT EXISTS kb_articles (
       id TEXT PRIMARY KEY,
@@ -145,6 +141,32 @@ export function getTicket(id) {
     if (ticket.categories) ticket.categories = JSON.parse(ticket.categories);
   }
   return ticket;
+}
+
+export function searchIncidents(query) {
+  const database = getDb();
+  const normalizedQuery = typeof query === 'string' ? query.trim() : '';
+  if (!normalizedQuery) return [];
+
+  const stmt = database.prepare(`
+    SELECT id, title, summary, category, severity, keywords, region, platform
+    FROM incident
+    WHERE instr(lower(title), lower(@query)) > 0
+       OR instr(lower(summary), lower(@query)) > 0
+       OR instr(lower(category), lower(@query)) > 0
+       OR instr(lower(severity), lower(@query)) > 0
+       OR instr(lower(COALESCE(keywords, '')), lower(@query)) > 0
+       OR instr(lower(COALESCE(region, '')), lower(@query)) > 0
+       OR instr(lower(COALESCE(platform, '')), lower(@query)) > 0
+    ORDER BY id ASC
+  `);
+  return stmt.all({ query: normalizedQuery });
+}
+
+export function getIncident(id) {
+  const database = getDb();
+  const stmt = database.prepare(`SELECT * FROM incident WHERE id = ?`);
+  return stmt.get(id);
 }
 
 export function updateTicketStatus(id, status, errorMessage = null) {
