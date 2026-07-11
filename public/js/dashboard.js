@@ -1,3 +1,5 @@
+import { formatHumanHistory, formatRawHistory } from './historyFormatter.js';
+
 document.addEventListener('DOMContentLoaded', () => {
   const POLL_INTERVAL = 3000;
 
@@ -15,7 +17,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const detailTitle = document.getElementById('detail-title');
   const detailFields = document.getElementById('detail-fields');
   const detailHistory = document.getElementById('detail-history');
+  const detailActions = document.getElementById('detail-actions');
   const detailClose = document.getElementById('detail-close');
+  const historyHuman = document.getElementById('history-human');
+  const historyRaw = document.getElementById('history-raw');
+  let currentHistory = [];
+  let historyMode = 'human';
+
+  historyHuman.addEventListener('click', () => setHistoryMode('human'));
+  historyRaw.addEventListener('click', () => setHistoryMode('raw'));
 
   // Close detail panel
   detailClose.addEventListener('click', () => { detailOverlay.style.display = 'none'; });
@@ -147,24 +157,23 @@ document.addEventListener('DOMContentLoaded', () => {
     detailTitle.textContent = ticketId;
     detailFields.innerHTML = '<dd>Loading…</dd>';
     detailHistory.innerHTML = '<div class="text-muted">Loading…</div>';
+    currentHistory = [];
+    detailActions.style.display = 'none';
+    detailActions.innerHTML = '';
 
     // Fetch ticket detail
     try {
-      const res = await fetch(`/api/tickets/${ticketId}`);
+      const res = await fetch(`/api/tickets/${ticketId}?staff=true`);
       const t = await res.json();
 
       const fields = [
         ['ID', t.id], ['Subject', t.subject], ['Status', t.status],
         ['Description', t.description],
-        ['Requester', t.requester_id], ['Account', t.account_id],
-        ['Platform', t.platform], ['Region', t.region],
-        ['Device', t.device], ['Game Version', t.game_version],
-        ['Locale', t.locale],
-        ['Transaction', t.transaction_id], ['Product', t.product], ['Amount', t.amount],
         ['Categories', Array.isArray(t.categories) ? t.categories.join(', ') : t.categories],
         ['Severity', t.severity], ['Rationale', t.rationale],
         ['Routing', t.routing_destination], ['Routing Reason', t.routing_reason],
         ['Draft Response', t.draft_response],
+        ['Draft Status', t.draft_status],
         ['Error', t.error_message],
         ['Created', t.created_at], ['Updated', t.updated_at]
       ];
@@ -172,6 +181,25 @@ document.addEventListener('DOMContentLoaded', () => {
       detailFields.innerHTML = fields.map(([label, val]) =>
         `<dt>${esc(label)}</dt><dd>${esc(val != null ? String(val) : '–')}</dd>`
       ).join('');
+
+      if (t.draft_status === 'pending_review' && t.draft_response) {
+        detailActions.style.display = 'block';
+        detailActions.innerHTML = '<button class="btn btn-primary" id="approve-draft">Approve & Send Response</button>';
+        document.getElementById('approve-draft').addEventListener('click', async () => {
+          const button = document.getElementById('approve-draft');
+          button.disabled = true;
+          button.textContent = 'Publishing…';
+          const response = await fetch(`/api/tickets/${encodeURIComponent(ticketId)}/draft/approve`, { method: 'POST' });
+          if (response.ok) {
+            await openDetail(ticketId);
+            await fetchTickets();
+          } else {
+            const error = await response.json().catch(() => ({}));
+            button.disabled = false;
+            button.textContent = error.error || 'Approval failed';
+          }
+        });
+      }
     } catch (err) {
       detailFields.innerHTML = '<dd>Failed to load ticket.</dd>';
     }
@@ -183,46 +211,37 @@ document.addEventListener('DOMContentLoaded', () => {
         detailHistory.innerHTML = '<div class="text-muted">No history available.</div>';
         return;
       }
-      const history = await res.json();
-      detailHistory.innerHTML = renderHistory(history);
+      currentHistory = await res.json();
+      renderCurrentHistory();
     } catch (err) {
       detailHistory.innerHTML = '<div class="text-muted">Failed to load history.</div>';
     }
   }
 
-  function renderHistory(messages) {
+  function setHistoryMode(mode) {
+    historyMode = mode;
+    historyHuman.classList.toggle('btn-primary', mode === 'human');
+    historyRaw.classList.toggle('btn-primary', mode === 'raw');
+    renderCurrentHistory();
+  }
+
+  function renderCurrentHistory() {
+    if (historyMode === 'raw') {
+      detailHistory.innerHTML = `<pre class="timeline-content" style="max-height:none; overflow:auto; margin:0;">${esc(formatRawHistory(currentHistory))}</pre>`;
+      return;
+    }
+    detailHistory.innerHTML = renderHumanHistory(currentHistory);
+  }
+
+  function renderHumanHistory(messages) {
     if (!messages || messages.length === 0) {
       return '<div class="text-muted">No conversation history.</div>';
     }
-    return '<ul class="timeline">' + messages.map(msg => {
-      const role = msg.role || 'unknown';
-      let content = '';
-
-      if (role === 'assistant') {
-        if (msg.tool_calls && msg.tool_calls.length > 0) {
-          content = msg.tool_calls.map(tc => {
-            const fn = tc.function || {};
-            let args = fn.arguments || '{}';
-            try { args = JSON.stringify(JSON.parse(args), null, 2); } catch (e) {}
-            return `→ ${fn.name}(${args})`;
-          }).join('\n');
-        }
-        if (msg.reasoning_content) {
-          content = '💭 ' + msg.reasoning_content + (content ? '\n' + content : '');
-        }
-        if (msg.content) {
-          content = msg.content + (content ? '\n' + content : '');
-        }
-      } else if (role === 'tool') {
-        content = `[${msg.name || 'tool'}] ${msg.content || ''}`;
-      } else {
-        content = msg.content || '';
-      }
-
+    return '<ul class="timeline">' + formatHumanHistory(messages).map(entry => {
       return `
         <li class="timeline-item">
-          <div class="timeline-role ${role}">${role}</div>
-          <div class="timeline-content">${esc(truncate(content, 800))}</div>
+          <div class="timeline-role ${entry.role}">${esc(entry.label)}</div>
+          <div class="timeline-content">${esc(entry.content)}</div>
         </li>
       `;
     }).join('') + '</ul>';

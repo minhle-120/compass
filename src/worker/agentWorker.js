@@ -15,8 +15,12 @@ async function start() {
   logger.info(`Agent worker thread started for ticket ${ticketId}`, `Ticket-${ticketId}`);
   
   // Track checklist progress locally in the worker thread memory
+  const ticket = getTicket(ticketId);
+  if (!ticket) throw new Error(`Ticket "${ticketId}" not found before worker startup.`);
+
   const sessionContext = {
     ticketId,
+    workflowRevision: ticket.workflow_revision || 0,
     flags: {
       wasTicketRead: false,
       wasClassified: false,

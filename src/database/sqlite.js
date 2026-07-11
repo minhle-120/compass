@@ -45,10 +45,24 @@ export function initDb() {
       routing_destination TEXT,
       routing_reason TEXT,
       draft_response TEXT,
+      draft_status TEXT,
       error_message TEXT,
-      resolution_type TEXT
+      resolution_type TEXT,
+      resolution_reason TEXT,
+      workflow_revision INTEGER NOT NULL DEFAULT 0
     );
   `);
+
+  const ticketColumns = db.prepare('PRAGMA table_info(tickets)').all();
+  if (!ticketColumns.some((column) => column.name === 'resolution_reason')) {
+    db.exec('ALTER TABLE tickets ADD COLUMN resolution_reason TEXT');
+  }
+  if (!ticketColumns.some((column) => column.name === 'workflow_revision')) {
+    db.exec('ALTER TABLE tickets ADD COLUMN workflow_revision INTEGER NOT NULL DEFAULT 0');
+  }
+  if (!ticketColumns.some((column) => column.name === 'draft_status')) {
+    db.exec('ALTER TABLE tickets ADD COLUMN draft_status TEXT');
+  }
 
   logger.info(`SQLite database initialized at ${dbPath}`);
   return db;
@@ -75,15 +89,19 @@ export function resetInterruptedTickets() {
   return info.changes;
 }
 
-export function getNextPendingTicket() {
+export function getNextPendingTicket(excludedIds = []) {
   const database = getDb();
+  const exclusions = excludedIds.length
+    ? `AND id NOT IN (${excludedIds.map(() => '?').join(', ')})`
+    : '';
   const stmt = database.prepare(`
     SELECT * FROM tickets
     WHERE status = 'pending'
+    ${exclusions}
     ORDER BY created_at ASC
     LIMIT 1
   `);
-  return stmt.get();
+  return stmt.get(...excludedIds);
 }
 
 export function getTicket(id) {
@@ -136,22 +154,126 @@ export function updateTicketDraft(id, draftResponse) {
   const database = getDb();
   const stmt = database.prepare(`
     UPDATE tickets
-    SET draft_response = ?, updated_at = ?
+    SET draft_response = ?, draft_status = 'drafted', updated_at = ?
     WHERE id = ?
   `);
   const now = new Date().toISOString();
   stmt.run(draftResponse, now, id);
 }
 
-export function updateTicketResolution(id, resolutionType, resolutionReason) {
+export function finalizeTicket(id, status, resolutionType, resolutionReason, { draftResponseMode = 'staff_review' } = {}) {
   const database = getDb();
-  const stmt = database.prepare(`
-    UPDATE tickets
-    SET resolution_type = ?, rationale = ?, updated_at = ?
-    WHERE id = ?
-  `);
-  const now = new Date().toISOString();
-  stmt.run(resolutionType, resolutionReason, now, id);
+  const finalize = database.transaction(() => {
+    const now = new Date().toISOString();
+    const ticket = database.prepare(`
+      SELECT status, conversation, draft_response
+      FROM tickets
+      WHERE id = ?
+    `).get(id);
+    if (!ticket) throw new Error(`Ticket "${id}" not found during finalization.`);
+    if (ticket.status !== 'running') return { status: ticket.status, finalized: false };
+
+    let conversation = null;
+    let draftResponse = ticket.draft_response;
+    let draftStatus = draftResponse ? 'pending_review' : null;
+    if (draftResponseMode === 'auto_response' && draftResponse) {
+      try { conversation = ticket.conversation ? JSON.parse(ticket.conversation) : []; } catch { conversation = []; }
+      conversation.push({ sender: 'agent', timestamp: now, message: draftResponse });
+      draftResponse = null;
+      draftStatus = 'published';
+    }
+
+    const info = database.prepare(`
+      UPDATE tickets
+      SET status = ?, resolution_type = ?, resolution_reason = ?,
+          conversation = COALESCE(?, conversation), draft_response = ?, draft_status = ?,
+          error_message = NULL, updated_at = ?
+      WHERE id = ? AND status = 'running'
+    `).run(
+      status,
+      resolutionType,
+      resolutionReason,
+      conversation ? JSON.stringify(conversation) : null,
+      draftResponse,
+      draftStatus,
+      now,
+      id
+    );
+
+    if (info.changes === 1) return { status, finalized: true };
+    return { status: database.prepare('SELECT status FROM tickets WHERE id = ?').get(id).status, finalized: false };
+  });
+
+  return finalize();
+}
+
+export function publishDraftResponse(id) {
+  const database = getDb();
+  const publish = database.transaction(() => {
+    const ticket = database.prepare(`
+      SELECT conversation, draft_response, draft_status
+      FROM tickets
+      WHERE id = ?
+    `).get(id);
+    if (!ticket) throw new Error(`Ticket "${id}" not found.`);
+    if (!ticket.draft_response || ticket.draft_status !== 'pending_review') {
+      return { published: false, reason: 'No draft is awaiting staff review.' };
+    }
+
+    let conversation = [];
+    try { conversation = ticket.conversation ? JSON.parse(ticket.conversation) : []; } catch { conversation = []; }
+    const now = new Date().toISOString();
+    conversation.push({ sender: 'agent', timestamp: now, message: ticket.draft_response });
+    database.prepare(`
+      UPDATE tickets
+      SET conversation = ?, draft_response = NULL, draft_status = 'published', updated_at = ?
+      WHERE id = ?
+    `).run(JSON.stringify(conversation), now, id);
+
+    return { published: true };
+  });
+  return publish();
+}
+
+export function appendTicketMessage(id, sender, message) {
+  const database = getDb();
+  const append = database.transaction(() => {
+    const ticket = database.prepare(`
+      SELECT status, conversation, draft_response, draft_status, updated_at
+      FROM tickets
+      WHERE id = ?
+    `).get(id);
+    if (!ticket) return null;
+
+    let conversation = [];
+    if (ticket.conversation) {
+      try { conversation = JSON.parse(ticket.conversation); } catch { conversation = []; }
+    }
+    const draftWasVisible = ticket.status !== 'pending'
+      && ticket.status !== 'running'
+      && ticket.draft_status !== 'pending_review';
+    if (sender === 'player' && draftWasVisible && ticket.draft_response) {
+      conversation.push({
+        sender: 'agent',
+        timestamp: ticket.updated_at || new Date().toISOString(),
+        message: ticket.draft_response
+      });
+    }
+    conversation.push({ sender, timestamp: new Date().toISOString(), message });
+
+    const now = new Date().toISOString();
+    database.prepare(`
+      UPDATE tickets
+      SET conversation = ?, status = 'pending', workflow_revision = workflow_revision + 1,
+          draft_response = NULL, draft_status = NULL,
+          resolution_type = NULL, resolution_reason = NULL,
+          updated_at = ?
+      WHERE id = ?
+    `).run(JSON.stringify(conversation), now, id);
+
+    return database.prepare('SELECT workflow_revision FROM tickets WHERE id = ?').get(id);
+  });
+  return append();
 }
 
 export function insertTicket(ticket) {
@@ -206,4 +328,3 @@ export function getQueueStats() {
   }
   return stats;
 }
-

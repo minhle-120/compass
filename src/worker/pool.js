@@ -70,7 +70,7 @@ class WorkerPool {
 
     try {
       while (this.activeWorkers.size < config.concurrencyCap) {
-        const ticket = getNextPendingTicket();
+        const ticket = getNextPendingTicket(Array.from(this.activeWorkersMap.keys()));
         if (!ticket) {
           break; // No more pending tickets
         }
@@ -88,6 +88,10 @@ class WorkerPool {
    * Spawns a new worker thread for a given ticket ID.
    */
   spawnWorker(ticketId) {
+    if (this.activeWorkersMap.has(ticketId)) {
+      logger.warn(`Worker already active for ticket ${ticketId}; skipping duplicate spawn.`, 'WorkerPool');
+      return null;
+    }
     logger.info(`Spawning worker for ticket ${ticketId}`, 'WorkerPool');
     
     // Mark as running in database before spawning to prevent other threads/polls from grabbing it
@@ -117,21 +121,28 @@ class WorkerPool {
 
       this.activeWorkers.add(worker);
 
-      // Thread Execution Watchdog Timer
-      const watchdog = setTimeout(async () => {
-        logger.error(`Worker for ticket ${ticketId} exceeded execution budget of ${config.workerTimeoutMs}ms. Terminating thread.`, 'WorkerPool');
-        try {
-          await worker.terminate();
-        } catch (termErr) {
-          logger.error(`Failed to force terminate worker for ticket ${ticketId}`, 'WorkerPool', termErr);
-        }
-        updateTicketStatus(ticketId, 'failed', `Execution timeout: Worker thread hung for more than ${config.workerTimeoutMs}ms`);
-        this.activeWorkers.delete(worker);
-        this.activeWorkersMap.delete(ticketId);
-        this.checkQueue();
-      }, config.workerTimeoutMs);
+      // Inactivity watchdog: progress messages re-arm it, so healthy long-running
+      // workflows are not killed merely for exceeding an absolute wall-clock budget.
+      let watchdog;
+      const armWatchdog = () => {
+        clearTimeout(watchdog);
+        watchdog = setTimeout(async () => {
+          logger.error(`Worker for ticket ${ticketId} made no progress for ${config.workerTimeoutMs}ms. Terminating thread.`, 'WorkerPool');
+          try {
+            await worker.terminate();
+          } catch (termErr) {
+            logger.error(`Failed to force terminate worker for ticket ${ticketId}`, 'WorkerPool', termErr);
+          }
+          updateTicketStatus(ticketId, 'failed', `Execution timeout: no worker progress for ${config.workerTimeoutMs}ms`);
+          this.activeWorkers.delete(worker);
+          this.activeWorkersMap.delete(ticketId);
+          this.checkQueue();
+        }, config.workerTimeoutMs);
+      };
+      armWatchdog();
 
       worker.on('message', (msg) => {
+        armWatchdog();
         if (msg.type === 'log') {
           logger.info(`[Worker Log - ${ticketId}] ${msg.message}`, 'WorkerPool');
         } else if (msg.type === 'status_update') {

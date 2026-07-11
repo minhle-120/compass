@@ -14,9 +14,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const tickets = await res.json();
 
       // Separate open & closed tickets
-      // Open tickets: pending, running, escalated
+      // Open tickets: pending, running, awaiting staff review, escalated
       // Closed tickets: completed, failed
-      openTickets = tickets.filter(t => t.status === 'pending' || t.status === 'running' || t.status === 'escalated');
+      openTickets = tickets.filter(t => ['pending', 'running', 'awaiting_review', 'escalated'].includes(t.status));
       closedTickets = tickets.filter(t => t.status === 'completed' || t.status === 'failed');
 
       // Update Tab count labels
@@ -57,6 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const statusMap = {
         pending:    { label: 'In Queue',    cls: 'status-pending' },
         running:    { label: 'Processing',  cls: 'status-running' },
+        awaiting_review: { label: 'Awaiting Review', cls: 'status-awaiting_review' },
         escalated:  { label: 'Escalated',   cls: 'status-escalated' },
         completed:  { label: 'Closed',      cls: 'status-completed' },
         failed:     { label: 'Closed',      cls: 'status-completed' },
