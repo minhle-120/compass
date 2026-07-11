@@ -15,6 +15,7 @@ class WorkerPool {
   constructor() {
     this.activeWorkers = new Set();
     this.activeWorkersMap = new Map(); // ticketId -> state
+    this.workersByTicket = new Map();
     this.timer = null;
     this.isChecking = false;
   }
@@ -33,6 +34,23 @@ class WorkerPool {
 
   getActiveStates() {
     return Array.from(this.activeWorkersMap.values());
+  }
+
+  async cancelTicket(ticketId) {
+    const active = this.workersByTicket.get(ticketId);
+    if (!active) return false;
+
+    active.clearWatchdog();
+    this.workersByTicket.delete(ticketId);
+    this.activeWorkers.delete(active.worker);
+    this.activeWorkersMap.delete(ticketId);
+    try {
+      await active.worker.terminate();
+    } catch (error) {
+      logger.warn(`Worker termination for closed ticket ${ticketId} reported: ${errorMessage(error)}`, 'WorkerPool');
+    }
+    this.checkQueue();
+    return true;
   }
 
 
@@ -108,6 +126,7 @@ class WorkerPool {
       tokenCount: 0,
       flags: {
         wasTicketRead: false,
+        wasAttachmentsInspected: false,
         wasIncidentsChecked: false,
         wasClassified: false,
         wasResponseDrafted: false,
@@ -137,10 +156,15 @@ class WorkerPool {
           failRunningTicket(ticketId, `Execution timeout: no worker progress for ${config.workerTimeoutMs}ms`);
           this.activeWorkers.delete(worker);
           this.activeWorkersMap.delete(ticketId);
+          this.workersByTicket.delete(ticketId);
           this.checkQueue();
         }, config.workerTimeoutMs);
       };
       armWatchdog();
+      this.workersByTicket.set(ticketId, {
+        worker,
+        clearWatchdog: () => clearTimeout(watchdog)
+      });
 
       worker.on('message', (msg) => {
         armWatchdog();
@@ -155,9 +179,11 @@ class WorkerPool {
 
       worker.on('error', (err) => {
         clearTimeout(watchdog);
+        if (!this.activeWorkers.has(worker) && !this.workersByTicket.has(ticketId)) return;
         logger.error(`Error in worker for ticket ${ticketId}`, 'WorkerPool', err);
         failRunningTicket(ticketId, errorMessage(err));
         this.activeWorkersMap.delete(ticketId);
+        this.workersByTicket.delete(ticketId);
       });
 
       worker.on('exit', (code) => {
@@ -165,6 +191,7 @@ class WorkerPool {
         if (this.activeWorkers.has(worker)) {
           this.activeWorkers.delete(worker);
           this.activeWorkersMap.delete(ticketId);
+          this.workersByTicket.delete(ticketId);
           logger.info(`Worker for ticket ${ticketId} exited with code ${code}. Active workers: ${this.activeWorkers.size}`, 'WorkerPool');
           // Immediately check queue when a slot opens up
           this.checkQueue();
@@ -175,6 +202,7 @@ class WorkerPool {
       logger.error(`Failed to instantiate worker for ticket ${ticketId}`, 'WorkerPool', err);
       failRunningTicket(ticketId, `Failed to spawn worker: ${errorMessage(err)}`);
       this.activeWorkersMap.delete(ticketId);
+      this.workersByTicket.delete(ticketId);
     }
   }
 

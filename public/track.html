@@ -74,6 +74,63 @@
     .ticket-timeline-item.agent .ticket-timeline-header {
       background-color: rgba(185, 229, 220, .35);
     }
+    .ticket-timeline-item.ai-working {
+      margin-top: -8px;
+    }
+    .ticket-timeline-item.ai-working .ticket-timeline-content {
+      border-color: var(--line);
+    }
+    .ai-working-body {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      color: var(--ink-soft);
+      font-family: var(--mono);
+      font-size: 13px;
+    }
+    .ai-working-spinner {
+      width: 16px;
+      height: 16px;
+      box-sizing: border-box;
+      border: 2px solid var(--line);
+      border-top-color: var(--ink);
+      border-radius: 50%;
+      animation: ai-working-spin .8s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes ai-working-spin {
+      to { transform: rotate(360deg); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .ai-working-spinner { animation: none; }
+    }
+    .ticket-media-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px;
+      padding: 0 16px 16px;
+    }
+    .ticket-media-item {
+      margin: 0;
+      min-width: 0;
+    }
+    .ticket-media-item img,
+    .ticket-media-item video {
+      display: block;
+      width: 100%;
+      max-height: 320px;
+      object-fit: contain;
+      background: var(--paper);
+      border: 1px solid var(--line);
+    }
+    .ticket-media-item figcaption {
+      margin-top: 5px;
+      overflow-wrap: anywhere;
+      color: var(--ink-soft);
+      font-family: var(--mono);
+      font-size: 12px;
+    }
   </style>
   <script src="/js/theme.js"></script>
 </head>
@@ -91,7 +148,7 @@
     </div>
     <div class="header-right">
       <button id="theme-toggle" class="btn btn-sm" aria-label="Toggle theme" style="padding: 4px 8px; line-height: 1;">
-        <span class="theme-toggle-icon">Dark</span>
+        <span class="theme-toggle-icon" aria-hidden="true">☾</span>
       </button>
     </div>
   </header>
@@ -129,6 +186,7 @@
         <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
           <h1 id="ticket-title" style="font-size: 24px; font-weight: 600;">Ticket Subject</h1>
           <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+            <button id="close-ticket-btn" class="btn btn-sm" type="button" style="display: none;">Close ticket</button>
             <button id="delete-ticket-btn" class="btn btn-danger btn-sm" type="button" style="display: none;">Delete ticket</button>
             <span id="ticket-resolution" class="status-badge" style="display: none;"></span>
             <span id="ticket-status" class="status-badge">pending</span>

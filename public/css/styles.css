@@ -304,6 +304,30 @@ a {
   margin-bottom: 18px;
 }
 
+.theme-toggle-icon {
+  display: inline-block;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.attachment-preview {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.attachment-preview-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
 .form-group label {
   display: block;
   margin-bottom: 7px;

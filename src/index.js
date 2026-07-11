@@ -9,7 +9,7 @@ import { logger } from './utils/logger.js';
 import { isValidTicketId } from './utils/ticketId.js';
 import { normalizeTicketSubmission } from './utils/ticketSubmission.js';
 import { presentTicket } from './utils/ticketPresentation.js';
-import { initDb, resetInterruptedTickets, getTicket, insertTicket, getDb, getQueueStats, appendTicketMessage, publishDraftResponse } from './database/sqlite.js';
+import { initDb, resetInterruptedTickets, getTicket, insertTicket, getDb, getQueueStats, appendTicketMessage, publishDraftResponse, closeTicketByUser } from './database/sqlite.js';
 import { deleteResolvedTicket, TicketDeletionError } from './services/ticketDeletion.js';
 import { pool } from './worker/pool.js';
 import {
@@ -39,7 +39,7 @@ startWikiSync();
 pool.start();
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '30mb' }));
 
 // Serve static assets from public folder
 app.use(express.static(join(__dirname, '../public')));
@@ -145,7 +145,9 @@ app.get('/api/tickets', (req, res) => {
     const tickets = rows.map(ticket => {
       const copy = { ...ticket };
       if (copy.attachments) {
-        try { copy.attachments = JSON.parse(copy.attachments); } catch (e) {}
+        try {
+          copy.attachments = JSON.parse(copy.attachments).map(({ name, type, size }) => ({ name, type, size }));
+        } catch (e) {}
       }
       if (copy.conversation) {
         try { copy.conversation = JSON.parse(copy.conversation); } catch (e) {}
@@ -218,6 +220,25 @@ app.delete('/api/tickets/:id', (req, res) => {
   }
 });
 
+// Player action to close an open ticket without deleting its history.
+app.post('/api/tickets/:id/close', async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!isValidTicketId(id)) return res.status(400).json({ error: 'Invalid ticket ID' });
+    if (!getTicket(id)) return res.status(404).json({ error: 'Ticket not found' });
+
+    await pool.cancelTicket(id);
+    const closed = closeTicketByUser(id);
+    if (!closed) return res.status(409).json({ error: 'This ticket is already closed.' });
+
+    logger.info(`Ticket ${id} was closed by the player`, 'ExpressAPI');
+    return res.json({ message: 'Ticket closed successfully', ticketId: id });
+  } catch (err) {
+    logger.error(`Failed to close ticket ${req.params.id}`, 'ExpressAPI', err);
+    return res.status(500).json({ error: 'Failed to close ticket' });
+  }
+});
+
 // Staff action to approve and publish a pending AI draft.
 app.post('/api/tickets/:id/draft/approve', (req, res) => {
   try {
@@ -271,6 +292,14 @@ app.post('/api/tickets/:id/messages', (req, res) => {
     const ticket = getTicket(id);
     if (!ticket) {
       return res.status(404).json({ error: 'Ticket not found' });
+    }
+    const acceptsReplies = ['pending', 'running', 'escalated'].includes(ticket.status)
+      || (ticket.status === 'completed' && (
+        ticket.resolution_type === 'needs_clarification'
+        || ticket.draft_status === 'pending_review'
+      ));
+    if (!acceptsReplies) {
+      return res.status(409).json({ error: 'This ticket is closed and cannot receive new replies.' });
     }
 
     appendTicketMessage(id, sender || 'player', message.trim());
