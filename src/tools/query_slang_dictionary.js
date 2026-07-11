@@ -5,7 +5,7 @@ export const schema = {
   type: 'function',
   function: {
     name: 'query_slang_dictionary',
-    description: 'Look up a slang term directly in the current MLBtrio/genz-slang-dataset on Hugging Face.',
+    description: 'Look up a slang term in the local Compass slang wiki, the Gen-Z slang dataset, and Urban Dictionary.',
     parameters: {
       type: 'object',
       properties: {
@@ -31,11 +31,17 @@ export async function handler(args, sessionContext) {
     if (row) {
       const exampleStr = row.example ? `\nExample: ${row.example}` : '';
       const contextStr = row.context ? `\nContext: ${row.context}` : '';
-      return `[Gen-Z Slang] ${row.slang}: ${row.description}${exampleStr}${contextStr}`;
+      return `[${formatSource(row)}] ${row.slang}: ${row.description}${exampleStr}${contextStr}`;
     }
 
     return `No slang definition found for "${term}".`;
   } catch (error) {
     return `Slang lookup failed: ${error.message}`;
   }
+}
+
+function formatSource(row) {
+  if (row.source === 'local_slang') return 'Compass Slang';
+  if (row.source === 'urban_dictionary') return 'Urban Dictionary';
+  return 'Gen-Z Slang';
 }

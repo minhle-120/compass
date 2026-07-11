@@ -11,13 +11,13 @@ export const schema = {
   type: 'function',
   function: {
     name: 'search_knowledge_base',
-    description: 'Search the editable local Compass game wiki and the current Gen-Z slang dataset. Returns IDs and summaries that can be passed to get_knowledge_base_article.',
+    description: 'Search the editable local Compass game wiki plus local and remote slang sources. Returns IDs and summaries that can be passed to get_knowledge_base_article.',
     parameters: {
       type: 'object',
       properties: {
         query: {
           type: 'string',
-          description: 'Player text or keywords to search for in the local game wiki and slang dataset.'
+          description: 'Player text or keywords to search for in the local game wiki and slang dictionaries.'
         }
       },
       required: ['query']
@@ -68,13 +68,14 @@ export async function handler(args, sessionContext) {
         summary: row.description,
         status: 'reference',
         updated_at: null,
-        source: 'huggingface_genz_slang',
+        source: row.source,
         source_dataset: row.source_dataset,
+        source_url: row.source_url,
         relevance: 100
       });
     }
   } else {
-    errors.push(`Gen-Z slang lookup failed: ${slangResult.reason?.message || slangResult.reason}`);
+    errors.push(`Slang lookup failed: ${slangResult.reason?.message || slangResult.reason}`);
   }
 
   if (wikiResult.status === 'fulfilled') {

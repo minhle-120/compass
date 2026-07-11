@@ -486,6 +486,27 @@ select.form-control {
   color: var(--danger);
 }
 
+.label-severity-critical {
+  background: var(--color-danger-bg);
+  color: var(--danger);
+}
+
+.label-severity-high {
+  background: var(--color-warning-bg);
+  color: var(--warning);
+}
+
+.label-severity-medium {
+  background: var(--color-info-bg);
+  color: var(--color-info);
+}
+
+.label-severity-low {
+  background: var(--paper-bright);
+  border-color: var(--line);
+  color: var(--ink-soft);
+}
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -610,6 +631,83 @@ select.form-control {
   background: var(--aqua);
   border-color: transparent;
   color: var(--ink);
+}
+
+.incident-list {
+  display: grid;
+  gap: 12px;
+}
+
+.incident-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 280px);
+  gap: 16px;
+  padding: 16px;
+  background: rgba(251, 250, 245, .78);
+  border: 1px solid var(--ink);
+}
+
+:root[data-theme="dark"] .incident-card {
+  background: rgba(23, 40, 43, .78);
+}
+
+.incident-card-header,
+.incident-meta,
+.incident-ticket-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.incident-id {
+  color: var(--signal-dark);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.incident-card h3 {
+  margin: 8px 0 6px;
+  font-family: var(--display);
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1.1;
+}
+
+.incident-card p {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+.incident-meta {
+  margin-top: 10px;
+  color: var(--ink-soft);
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.incident-ticket-list {
+  align-content: start;
+  padding-left: 16px;
+  border-left: 1px solid var(--line);
+}
+
+.incident-ticket-link {
+  padding: 4px 7px;
+  color: var(--signal-dark);
+  background: var(--paper-bright);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.incident-ticket-link:hover {
+  border-color: var(--ink);
+  box-shadow: 2px 2px 0 var(--ink);
 }
 
 .timeline {
@@ -779,8 +877,16 @@ select.form-control {
   }
 
   .form-row,
+  .incident-card,
   .detail-grid {
     grid-template-columns: 1fr;
+  }
+
+  .incident-ticket-list {
+    padding-top: 12px;
+    padding-left: 0;
+    border-top: 1px solid var(--line);
+    border-left: 0;
   }
 
   .ticket-table {

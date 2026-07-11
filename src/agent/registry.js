@@ -101,6 +101,9 @@ export async function executeTool(name, args, sessionContext) {
     if (resolutionType === 'resolved') {
       if (!sessionContext.flags.wasIncidentsChecked) missing.push('search_incidents or get_incident_details');
       if (!sessionContext.flags.wasKnowledgeBaseChecked) missing.push('search_knowledge_base or get_knowledge_base_article');
+      if (!sessionContext.flags.wasSameTypeTicketsCompared && !sessionContext.directIncidentLinked) {
+        missing.push('compare_same_type_tickets or classify_ticket with existing_incident_id');
+      }
       if (!sessionContext.flags.wasClassified) missing.push('classify_ticket');
       if (!sessionContext.flags.wasResponseDrafted) missing.push('draft_response');
       if (!sessionContext.flags.wasRouted) missing.push('route_ticket');
@@ -109,6 +112,9 @@ export async function executeTool(name, args, sessionContext) {
     } else if (resolutionType === 'escalated') {
 
       if (!sessionContext.flags.wasIncidentsChecked) missing.push('search_incidents or get_incident_details');
+      if (!sessionContext.flags.wasSameTypeTicketsCompared && !sessionContext.directIncidentLinked) {
+        missing.push('compare_same_type_tickets or classify_ticket with existing_incident_id');
+      }
       if (!sessionContext.flags.wasClassified) missing.push('classify_ticket');
       if (!sessionContext.flags.wasRouted) missing.push('route_ticket');
     } else if (resolutionType === 'rejected') {
@@ -147,6 +153,13 @@ export async function executeTool(name, args, sessionContext) {
       sessionContext.flags.wasAttachmentsInspected = true;
     } else if (name === 'classify_ticket') {
       sessionContext.flags.wasClassified = true;
+      const linkedIncidentId = parseLinkedIncidentId(result);
+      if (linkedIncidentId) {
+        sessionContext.directIncidentLinked = true;
+        sessionContext.linkedIncidentId = linkedIncidentId;
+      }
+    } else if (name === 'compare_same_type_tickets') {
+      sessionContext.flags.wasSameTypeTicketsCompared = true;
     } else if (name === 'draft_response') {
       sessionContext.flags.wasResponseDrafted = true;
     } else if (name === 'search_incidents' || name === 'get_incident_details') {
@@ -171,6 +184,19 @@ export async function executeTool(name, args, sessionContext) {
       }
     };
   }
+}
+
+function parseLinkedIncidentId(result) {
+  const output = result && typeof result === 'object' ? result.existing_incident_id || result.output : result;
+  if (typeof output === 'string') {
+    try {
+      const parsed = JSON.parse(output);
+      return parsed?.existing_incident_id || parsed?.problem?.incident_id || null;
+    } catch {
+      return null;
+    }
+  }
+  return output?.existing_incident_id || output?.problem?.incident_id || null;
 }
 
 function getUnknownWordChecks(sessionContext, key) {

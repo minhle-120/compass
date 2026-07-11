@@ -9,9 +9,10 @@ import { logger } from './utils/logger.js';
 import { isValidTicketId } from './utils/ticketId.js';
 import { normalizeAttachments, normalizeTicketSubmission } from './utils/ticketSubmission.js';
 import { presentTicket } from './utils/ticketPresentation.js';
-import { initDb, resetInterruptedTickets, getTicket, insertTicket, getDb, getQueueStats, appendTicketMessage, publishDraftResponse, closeTicketByUser } from './database/sqlite.js';
+import { initDb, resetInterruptedTickets, getTicket, insertTicket, getDb, getQueueStats, appendTicketMessage, publishDraftResponse, closeTicketByUser, getIncidentTicketSummary } from './database/sqlite.js';
 import { deleteResolvedTicket, TicketDeletionError } from './services/ticketDeletion.js';
 import { pool } from './worker/pool.js';
+import { listUnresolvedIncidents } from '../services/incident/incidentService.js';
 import {
   WikiValidationError,
   createWikiEntry,
@@ -25,6 +26,16 @@ import {
   updateWikiEntry
 } from '../services/wiki/wikiService.js';
 import { startWikiSync } from '../services/wiki/sync.js';
+import {
+  SlangValidationError,
+  createLocalSlangEntry,
+  deleteLocalSlangEntry,
+  getLocalSlangEntry,
+  getSlangStats,
+  initSlangDb,
+  listLocalSlangEntries,
+  updateLocalSlangEntry
+} from '../services/slang/slangService.js';
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -33,6 +44,7 @@ const __dirname = dirname(__filename);
 initDb();
 resetInterruptedTickets();
 initWikiDb();
+initSlangDb();
 startWikiSync();
 
 // Start worker thread pool
@@ -46,6 +58,10 @@ app.use(express.static(join(__dirname, '../public')));
 
 app.get('/wiki', (req, res) => {
   res.sendFile(join(__dirname, '../public/wiki.html'));
+});
+
+app.get('/slang', (req, res) => {
+  res.sendFile(join(__dirname, '../public/slang.html'));
 });
 
 app.get('/flags', (req, res) => {
@@ -135,6 +151,66 @@ app.delete('/api/wiki/:id', (req, res) => {
   }
 });
 
+app.get('/api/slang', (req, res) => {
+  try {
+    res.json(listLocalSlangEntries({
+      query: req.query.query || '',
+      category: req.query.category || '',
+      limit: req.query.limit,
+      offset: req.query.offset
+    }));
+  } catch (error) {
+    sendSlangError(res, error, 'list slang entries');
+  }
+});
+
+app.get('/api/slang/stats', (req, res) => {
+  try {
+    res.json(getSlangStats());
+  } catch (error) {
+    sendSlangError(res, error, 'retrieve slang statistics');
+  }
+});
+
+app.get('/api/slang/:id', (req, res) => {
+  try {
+    const entry = getLocalSlangEntry(req.params.id);
+    if (!entry) return res.status(404).json({ error: 'Slang entry not found.' });
+    res.json(entry);
+  } catch (error) {
+    sendSlangError(res, error, 'retrieve slang entry');
+  }
+});
+
+app.post('/api/slang', (req, res) => {
+  try {
+    res.status(201).json(createLocalSlangEntry(req.body));
+  } catch (error) {
+    sendSlangError(res, error, 'create slang entry');
+  }
+});
+
+app.put('/api/slang/:id', (req, res) => {
+  try {
+    const entry = updateLocalSlangEntry(req.params.id, req.body);
+    if (!entry) return res.status(404).json({ error: 'Slang entry not found.' });
+    res.json(entry);
+  } catch (error) {
+    sendSlangError(res, error, 'update slang entry');
+  }
+});
+
+app.delete('/api/slang/:id', (req, res) => {
+  try {
+    if (!deleteLocalSlangEntry(req.params.id)) {
+      return res.status(404).json({ error: 'Slang entry not found.' });
+    }
+    res.status(204).end();
+  } catch (error) {
+    sendSlangError(res, error, 'delete slang entry');
+  }
+});
+
 // API Endpoint to fetch status of all tickets
 app.get('/api/tickets', (req, res) => {
   try {
@@ -184,6 +260,21 @@ app.get('/api/system/status', (req, res) => {
   } catch (err) {
     logger.error('Failed to retrieve system status', 'ExpressAPI', err);
     res.status(500).json({ error: 'Failed to retrieve system status' });
+  }
+});
+
+app.get('/api/incidents/open', (req, res) => {
+  try {
+    const incidents = listUnresolvedIncidents({ limit: req.query.limit });
+    const ticketSummary = getIncidentTicketSummary(incidents.map((incident) => incident.id));
+    res.json(incidents.map((incident) => ({
+      ...incident,
+      ticket_count: ticketSummary[incident.id]?.ticket_count || 0,
+      ticket_ids: ticketSummary[incident.id]?.ticket_ids || []
+    })));
+  } catch (err) {
+    logger.error('Failed to retrieve open incidents', 'ExpressAPI', err);
+    res.status(500).json({ error: 'Failed to retrieve open incidents' });
   }
 });
 
@@ -357,6 +448,18 @@ function sendWikiError(res, error, action) {
   }
 
   logger.error(`Failed to ${action}`, 'WikiAPI', error);
+  return res.status(500).json({ error: `Failed to ${action}.` });
+}
+
+function sendSlangError(res, error, action) {
+  if (error instanceof SlangValidationError) {
+    return res.status(400).json({ error: error.message });
+  }
+  if (error?.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+    return res.status(409).json({ error: 'A slang entry with that term already exists.' });
+  }
+
+  logger.error(`Failed to ${action}`, 'SlangAPI', error);
   return res.status(500).json({ error: `Failed to ${action}.` });
 }
 

@@ -23,6 +23,7 @@
       <a href="/tickets.html">Browse Tickets</a>
       <a href="/dashboard.html">Dashboard</a>
       <a href="/wiki">Wiki</a>
+      <a href="/slang">Slang</a>
       <a href="/flags" class="active" aria-current="page">Flagged Words</a>
       <button id="theme-toggle" class="button" style="padding: 4px 10px; min-height: 28px; line-height: 1;" aria-label="Toggle theme">
         <span class="theme-toggle-icon" aria-hidden="true">☾</span>
@@ -36,7 +37,7 @@
         <p class="kicker">Agent feedback / Lexicon gaps</p>
         <h1>Words we could<br>not explain.</h1>
       </div>
-      <p>These words were absent from both the Gen-Z slang source and the local game wiki. Repeated sightings are grouped so the most frequent gaps rise naturally.</p>
+      <p>These words were absent from the slang sources and the local game wiki. Repeated sightings are grouped so the most frequent gaps rise naturally.</p>
     </section>
 
     <section id="flag-stats" class="flag-stats" aria-live="polite"></section>
@@ -69,20 +70,20 @@
   <dialog id="add-word-dialog">
     <form id="add-word-form" class="dialog-card">
       <p class="kicker">Promote to knowledge</p>
-      <h2>Add to wiki</h2>
+      <h2>Add entry</h2>
       <p>Publishing this definition will automatically resolve the flag.</p>
 
       <label for="add-word-term">Word</label>
       <input id="add-word-term" type="text" readonly>
 
+      <label for="add-word-target">Destination</label>
+      <select id="add-word-target" required>
+        <option value="slang" selected>Slang dictionary</option>
+        <option value="wiki">Game wiki</option>
+      </select>
+
       <label for="add-word-category">Category</label>
       <select id="add-word-category" required>
-        <option value="mechanic" selected>Mechanic</option>
-        <option value="agent">Agent</option>
-        <option value="ability">Ability</option>
-        <option value="ultimate">Ultimate</option>
-        <option value="map">Map</option>
-        <option value="weapon">Weapon</option>
       </select>
 
       <label for="add-word-explanation">Explanation</label>

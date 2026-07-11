@@ -15,6 +15,7 @@ import { parentPort, threadId } from 'worker_threads';
 const FLAG_BY_TOOL = {
   read_ticket: 'wasTicketRead',
   inspect_ticket_attachments: 'wasAttachmentsInspected',
+  compare_same_type_tickets: 'wasSameTypeTicketsCompared',
   classify_ticket: 'wasClassified',
   draft_response: 'wasResponseDrafted',
   search_incidents: 'wasIncidentsChecked',
@@ -111,6 +112,12 @@ function reconstructWorkflowFlags(messages, sessionContext) {
     if (toolName === 'read_ticket') {
       sessionContext.hasAttachments = Array.isArray(result.output?.attachments)
         && result.output.attachments.length > 0;
+    } else if (toolName === 'classify_ticket') {
+      const linkedIncidentId = parseLinkedIncidentId(result.output);
+      if (linkedIncidentId) {
+        sessionContext.directIncidentLinked = true;
+        sessionContext.linkedIncidentId = linkedIncidentId;
+      }
     }
 
     if (toolName === 'query_slang_dictionary') {
@@ -128,6 +135,18 @@ function reconstructWorkflowFlags(messages, sessionContext) {
       }
     }
   }
+}
+
+function parseLinkedIncidentId(output) {
+  if (typeof output === 'string') {
+    try {
+      const parsed = JSON.parse(output);
+      return parsed?.existing_incident_id || parsed?.problem?.incident_id || null;
+    } catch {
+      return null;
+    }
+  }
+  return output?.existing_incident_id || output?.problem?.incident_id || null;
 }
 
 function normalizeToolResult(result, toolName) {
@@ -286,16 +305,21 @@ export async function runAgentLoop(sessionContext) {
       modelName = config.openaiModel;
     }
 
+    const completionBody = {
+      model: modelName,
+      messages: messages,
+      tools: openAiTools,
+      tool_choice: 'auto'
+    };
+    if (config.llmTemperature !== null) {
+      completionBody.temperature = config.llmTemperature;
+    }
+
     let response;
     try {
       response = await requestCompletion(
         url,
-        {
-          model: modelName,
-          messages: messages,
-          tools: openAiTools,
-          tool_choice: 'auto'
-        },
+        completionBody,
         {
           headers: headers,
           timeout: requestTimeout

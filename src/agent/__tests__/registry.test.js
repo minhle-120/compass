@@ -11,6 +11,8 @@ function createSessionContext() {
     ticketId: 'T-REGISTRY',
     flags: {
       wasTicketRead: false,
+      wasAttachmentsInspected: false,
+      wasSameTypeTicketsCompared: false,
       wasClassified: false,
       wasResponseDrafted: false,
       wasIncidentsChecked: false,
@@ -27,6 +29,7 @@ describe('tool registry outcomes', () => {
     expect(names).toContain('idle');
     expect(names).toContain('read_ticket');
     expect(names).toContain('inspect_ticket_attachments');
+    expect(names).toContain('compare_same_type_tickets');
     expect(names).toContain('flag_unknown_word');
     expect(names).toContain('delete_resolved_ticket');
   });
@@ -66,6 +69,47 @@ describe('tool registry outcomes', () => {
     expect(result.terminal).toBe(false);
     expect(result.error.code).toBe('WORKFLOW_INCOMPLETE');
     expect(result.missingSteps).toContain('read_ticket');
+  });
+
+  it('requires same-type ticket comparison before completing a classified ticket', async () => {
+    const context = createSessionContext();
+    Object.assign(context.flags, {
+      wasTicketRead: true,
+      wasIncidentsChecked: true,
+      wasKnowledgeBaseChecked: true,
+      wasClassified: true,
+      wasResponseDrafted: true,
+      wasRouted: true
+    });
+
+    const result = await executeTool('idle', {
+      resolution_type: 'resolved',
+      reason: 'Done'
+    }, context);
+
+    expect(result).toMatchObject({ ok: false, error: { code: 'WORKFLOW_INCOMPLETE' } });
+    expect(result.missingSteps).toContain('compare_same_type_tickets or classify_ticket with existing_incident_id');
+  });
+
+  it('allows a direct incident link instead of same-type ticket comparison', async () => {
+    const context = createSessionContext();
+    Object.assign(context.flags, {
+      wasTicketRead: true,
+      wasIncidentsChecked: true,
+      wasKnowledgeBaseChecked: true,
+      wasClassified: true,
+      wasResponseDrafted: true,
+      wasRouted: true
+    });
+    context.directIncidentLinked = true;
+
+    const result = await executeTool('idle', {
+      resolution_type: 'resolved',
+      reason: 'Matched an active incident exactly.'
+    }, context);
+
+    expect(result).toMatchObject({ ok: true, terminal: true });
+    expect(context.resolutionType).toBe('resolved');
   });
 
   it('requires media inspection before completing a ticket with attachments', async () => {

@@ -12,7 +12,7 @@ const snapshotPaths = [
   join(__dirname, 'resources', 'valorant-terminology.json'),
   join(__dirname, 'resources', 'valorant-catalog.json')
 ];
-export const WIKI_CATEGORIES = ['agent', 'ability', 'ultimate', 'map', 'weapon', 'mechanic'];
+export const WIKI_CATEGORIES = ['agent', 'ability', 'ultimate', 'map', 'weapon', 'cosmetic', 'mechanic'];
 const SEARCH_STOP_WORDS = new Set([
   'a', 'an', 'and', 'are', 'as', 'at', 'be', 'for', 'from', 'i', 'in', 'is',
   'it', 'my', 'of', 'on', 'or', 'that', 'the', 'this', 'to', 'was', 'with',
@@ -241,6 +241,10 @@ export function deleteUnknownWord(id) {
   const numericId = parseId(id);
   if (!numericId) return false;
   return initWikiDb().prepare('DELETE FROM unknown_words WHERE id = ?').run(numericId).changes > 0;
+}
+
+export function resolveUnknownWord(term) {
+  resolveUnknownWordByTerm(initWikiDb(), term, new Date().toISOString());
 }
 
 export function getUnknownWord(id) {
