@@ -10,8 +10,12 @@ describe('Idle Tool', () => {
 
   it('should return idling status message on execution', async () => {
     const sessionContext = { ticketId: 'T-1001' };
-    const result = await handler({}, sessionContext);
+    const result = await handler({ resolution_type: 'resolved', reason: 'All tasks completed' }, sessionContext);
     expect(result).toContain('Agent idling');
-    expect(result).toContain('All tasks completed');
+    expect(result).toContain('Resolution: resolved');
+    expect(result).toContain('Reason: All tasks completed');
+    expect(sessionContext.resolutionType).toBe('resolved');
+    expect(sessionContext.resolutionReason).toBe('All tasks completed');
   });
 });
+

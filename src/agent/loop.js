@@ -204,12 +204,15 @@ export async function runAgentLoop(sessionContext) {
           logger.info(`Idle tool execution validated. Exiting agent loop.`, `Ticket-${ticketId}`);
           loopActive = false;
           
-          // Determine final status based on routing destination
-          if (sessionContext.flags.wasRouted && sessionContext.routingDestination === 'escalate') {
+          // Determine final status based on resolution outcome
+          if (sessionContext.resolutionType === 'escalated') {
             exitStatus = 'escalated';
+          } else {
+            exitStatus = 'completed';
           }
           break;
         }
+
       }
     } else {
       // If the model did not call any tools, it is in violation of system prompt instructions

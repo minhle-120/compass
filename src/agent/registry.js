@@ -76,19 +76,39 @@ export async function executeTool(name, args, sessionContext) {
 
   // Intercept the idle tool to perform the Local In-Worker Validation Check
   if (name === 'idle') {
+    const resolutionType = args.resolution_type;
     const missing = [];
-    if (!sessionContext.flags.wasTicketRead) missing.push('read_ticket');
-    if (!sessionContext.flags.wasIncidentsChecked) missing.push('search_incidents or get_incident_details');
-    if (!sessionContext.flags.wasClassified) missing.push('classify_ticket');
-    if (!sessionContext.flags.wasResponseDrafted) missing.push('draft_response');
-    if (!sessionContext.flags.wasRouted) missing.push('route_ticket');
+
+    // All outcomes require the ticket to be read first
+    if (!sessionContext.flags.wasTicketRead) {
+      missing.push('read_ticket');
+    }
+
+    if (resolutionType === 'resolved') {
+      if (!sessionContext.flags.wasIncidentsChecked) missing.push('search_incidents or get_incident_details');
+      if (!sessionContext.flags.wasClassified) missing.push('classify_ticket');
+      if (!sessionContext.flags.wasResponseDrafted) missing.push('draft_response');
+      if (!sessionContext.flags.wasRouted) missing.push('route_ticket');
+    } else if (resolutionType === 'needs_clarification') {
+      if (!sessionContext.flags.wasResponseDrafted) missing.push('draft_response');
+    } else if (resolutionType === 'escalated') {
+
+      if (!sessionContext.flags.wasIncidentsChecked) missing.push('search_incidents or get_incident_details');
+      if (!sessionContext.flags.wasClassified) missing.push('classify_ticket');
+      if (!sessionContext.flags.wasRouted) missing.push('route_ticket');
+    } else if (resolutionType === 'rejected') {
+      // Rejections (spam/invalid) only require read_ticket
+    } else {
+      missing.push('valid resolution_type (resolved, needs_clarification, escalated, or rejected)');
+    }
 
     if (missing.length > 0) {
-      const errorMsg = `Validation failed! You are missing required steps: ${missing.join(', ')}.`;
+      const errorMsg = `Validation failed! For resolution_type "${resolutionType}", you are missing required steps: ${missing.join(', ')}.`;
       logger.warn(errorMsg, `Ticket-${ticketId}`);
       return errorMsg;
     }
   }
+
 
   // Execute the tool handler
   try {

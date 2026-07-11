@@ -80,7 +80,7 @@ describe('Agent ReAct Loop', () => {
             tool_calls: [{
               id: 'call_2',
               type: 'function',
-              function: { name: 'idle', arguments: '{}' }
+              function: { name: 'idle', arguments: '{"resolution_type":"resolved","reason":"All tasks completed"}' }
             }]
           }
         }],
@@ -91,7 +91,7 @@ describe('Agent ReAct Loop', () => {
     // Mock tool executions
     executeTool
       .mockResolvedValueOnce('Ticket T-TEST-LOOP details') // read_ticket response
-      .mockResolvedValueOnce('# Agent idling\n\nAll tasks completed.'); // idle response
+      .mockResolvedValueOnce('# Agent idling\n\nResolution: resolved\nReason: All tasks completed'); // idle response
 
     const result = await runAgentLoop(sessionContext);
 
@@ -99,7 +99,8 @@ describe('Agent ReAct Loop', () => {
     expect(updateTicketStatus).toHaveBeenCalledWith(ticketId, 'completed');
     expect(executeTool).toHaveBeenCalledTimes(2);
     expect(executeTool).toHaveBeenNthCalledWith(1, 'read_ticket', {}, sessionContext);
-    expect(executeTool).toHaveBeenNthCalledWith(2, 'idle', {}, sessionContext);
+    expect(executeTool).toHaveBeenNthCalledWith(2, 'idle', { resolution_type: 'resolved', reason: 'All tasks completed' }, sessionContext);
+
 
     // Verify history file was saved
     expect(existsSync(historyFilePath)).toBe(true);
@@ -162,7 +163,7 @@ describe('Agent ReAct Loop', () => {
             tool_calls: [{
               id: 'call_idle',
               type: 'function',
-              function: { name: 'idle', arguments: '{}' }
+              function: { name: 'idle', arguments: '{"resolution_type":"resolved","reason":"All tasks completed"}' }
             }]
           }
         }],
@@ -170,7 +171,8 @@ describe('Agent ReAct Loop', () => {
       }
     });
 
-    executeTool.mockResolvedValueOnce('Success');
+    executeTool.mockResolvedValueOnce('# Agent idling\n\nResolution: resolved\nReason: All tasks completed');
+
 
     await runAgentLoop(sessionContext);
 
@@ -201,7 +203,7 @@ describe('Agent ReAct Loop', () => {
             tool_calls: [{
               id: 'call_1',
               type: 'function',
-              function: { name: 'idle', arguments: '{}' }
+              function: { name: 'idle', arguments: '{"resolution_type":"resolved","reason":"All tasks completed"}' }
             }]
           }
         }],
@@ -209,7 +211,8 @@ describe('Agent ReAct Loop', () => {
       }
     });
 
-    executeTool.mockResolvedValueOnce('# Agent idling\n\nAll tasks completed.');
+    executeTool.mockResolvedValueOnce('# Agent idling\n\nResolution: resolved\nReason: All tasks completed');
+
 
     const result = await runAgentLoop(sessionContext);
 
@@ -237,8 +240,9 @@ describe('Agent ReAct Loop', () => {
       { role: 'user', content: 'A new ticket is assigned to you...' },
       { role: 'assistant', tool_calls: [{ id: 'call_init_read', type: 'function', function: { name: 'read_ticket', arguments: '{}' } }] },
       { role: 'tool', tool_call_id: 'call_init_read', name: 'read_ticket', content: 'Ticket details' },
-      { role: 'assistant', tool_calls: [{ id: 'call_init_idle', type: 'function', function: { name: 'idle', arguments: '{}' } }] },
-      { role: 'tool', tool_call_id: 'call_init_idle', name: 'idle', content: '# Agent idling' },
+      { role: 'assistant', tool_calls: [{ id: 'call_init_idle', type: 'function', function: { name: 'idle', arguments: '{"resolution_type":"resolved","reason":"All tasks completed"}' } }] },
+      { role: 'tool', tool_call_id: 'call_init_idle', name: 'idle', content: '# Agent idling\n\nResolution: resolved\nReason: All tasks completed' },
+
       // Wake-up message added by the API
       { role: 'user', content: 'The player has sent a new update. Call read_ticket to read the new message and update the ticket state.' }
     ];
@@ -269,13 +273,14 @@ describe('Agent ReAct Loop', () => {
             tool_calls: [{
               id: 'call_resume_idle',
               type: 'function',
-              function: { name: 'idle', arguments: '{}' }
+              function: { name: 'idle', arguments: '{"resolution_type":"resolved","reason":"All tasks completed"}' }
             }]
           }
         }],
         usage: { total_tokens: 240 }
       }
     });
+
 
     executeTool
       .mockResolvedValueOnce('Updated ticket details with player response')
@@ -288,7 +293,8 @@ describe('Agent ReAct Loop', () => {
     expect(updateTicketStatus).toHaveBeenCalledWith(ticketId, 'completed');
     expect(executeTool).toHaveBeenCalledTimes(2);
     expect(executeTool).toHaveBeenNthCalledWith(1, 'read_ticket', {}, sessionContext);
-    expect(executeTool).toHaveBeenNthCalledWith(2, 'idle', {}, sessionContext);
+    expect(executeTool).toHaveBeenNthCalledWith(2, 'idle', { resolution_type: 'resolved', reason: 'All tasks completed' }, sessionContext);
+
 
     // Verify history file now contains the appended resumed messages
     const history = JSON.parse(readFileSync(historyFilePath, 'utf8'));
