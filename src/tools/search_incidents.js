@@ -1,5 +1,5 @@
 // src/tools/search_incidents.js
-import { searchIncidents } from '../../services/incident/incidentService.js';
+import { searchIncidents } from '../database/sqlite.js';
 
 export const schema = {
   type: 'function',
@@ -20,5 +20,10 @@ export const schema = {
 };
 
 export async function handler(args, sessionContext) {
-  return searchIncidents(args?.query);
+  const query = typeof args?.query === 'string' ? args.query.trim() : '';
+  if (!query) {
+    throw new TypeError('query must be a non-empty string');
+  }
+
+  return JSON.stringify({ incidents: searchIncidents(query) });
 }
