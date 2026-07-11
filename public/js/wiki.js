@@ -65,6 +65,13 @@ if (initialId) {
   if (initialEntry) showEntry(initialEntry);
 }
 
+setInterval(() => {
+  if (elements.editor.hidden) {
+    loadEntries(elements.search.value);
+    loadStats();
+  }
+}, 10000);
+
 async function loadEntries(query = '') {
   elements.list.innerHTML = '<p class="list-message">Consulting the index...</p>';
   try {

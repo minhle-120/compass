@@ -17,7 +17,6 @@ import {
   deleteWikiEntry,
   getWikiEntry,
   getWikiStats,
-  deleteUnknownWord,
   listUnknownWords,
   initWikiDb,
   listWikiEntries,
@@ -93,17 +92,6 @@ app.patch('/api/wiki/flags/:id', (req, res) => {
     res.json(entry);
   } catch (error) {
     sendWikiError(res, error, 'update flagged word');
-  }
-});
-
-app.delete('/api/wiki/flags/:id', (req, res) => {
-  try {
-    if (!deleteUnknownWord(req.params.id)) {
-      return res.status(404).json({ error: 'Flagged word not found.' });
-    }
-    res.status(204).end();
-  } catch (error) {
-    sendWikiError(res, error, 'delete flagged word');
   }
 });
 

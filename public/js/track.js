@@ -57,8 +57,9 @@ document.addEventListener('DOMContentLoaded', () => {
       ticketIdDisplay.textContent = ticket.id;
       
       // Update Status Badge
-      ticketStatus.textContent = ticket.status;
-      ticketStatus.className = `status-badge status-${ticket.status}`;
+      const isOpen = ['pending', 'running', 'awaiting_review', 'escalated', 'needs_clarification'].includes(ticket.status);
+      ticketStatus.textContent = isOpen ? 'Open' : 'Closed';
+      ticketStatus.className = `status-badge ${isOpen ? 'status-running' : 'status-completed'}`;
 
       // Update Resolution Badge (idle conclusion)
       if (ticket.resolution_type) {
@@ -75,10 +76,17 @@ document.addEventListener('DOMContentLoaded', () => {
         ticketResolution.style.display = 'none';
       }
 
-      // Stop polling once ticket has a terminal status
-      if (!['pending', 'running', 'awaiting_review'].includes(ticket.status) && pollInterval) {
-        clearInterval(pollInterval);
-        pollInterval = null;
+      // Manage polling dynamically based on status
+      const isActive = ['pending', 'running', 'awaiting_review'].includes(ticket.status);
+      if (isActive) {
+        if (!pollInterval) {
+          pollInterval = setInterval(fetchTicketDetails, 4000);
+        }
+      } else {
+        if (pollInterval) {
+          clearInterval(pollInterval);
+          pollInterval = null;
+        }
       }
 
       // Update date format
