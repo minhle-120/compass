@@ -25,14 +25,20 @@ graph TD
 
 ### 1.1 Management Level (Parent Thread)
 * **Express Web Server (`src/index.js`)**: Hosts endpoints to serve the web dashboard, submit support tickets, and fetch conversation audit logs.
-* **SQLite Database (`src/database/sqlite.js`)**: The source of truth for the ticket queue, live incident tables, knowledge base articles, and slang.
+* **SQLite Database (`src/database/sqlite.js`)**: Low-level infrastructural driver for the ticket queue database. Manages tables, transactions, state mutations, and startup queue cleanups.
 * **Worker Pool (`src/worker/pool.js`)**: Polling orchestrator that manages concurrency (capped at 5 tickets) and spawns isolated `worker_threads` for pending tickets.
 * **Crash Recovery**: During initialization, the manager resets any ticket stuck in `running` status back to `pending` so the queue resumes gracefully on startup.
+
 
 ### 1.2 Agent Level (Worker Threads)
 * **Worker Wrapper (`src/worker/agentWorker.js`)**: Runs a dedicated thread per ticket. It manages a temporary `sessionContext` tracking checklist validation flags in thread memory.
 * **ReAct Executor (`src/agent/loop.js`)**: Runs the prompt loop. It sends the conversation history to the model, parses tool requests, handles JSON checkpointing, and enforces the token safety budget.
 * **Tool Registry (`src/agent/registry.js`)**: A dynamic plugin broker. It scans the `src/tools/` folder, auto-registers any tool defining a `schema` and a `handler` via dynamic ES imports, and intercepts the `idle` call to run checks.
+
+### 1.3 Services Layer (Domain Services)
+* **Ticket Service (`services/ticket/`)**: High-level repository pattern for ticket querying. Resolves ticket information and writes outcomes back to the queue.
+* **Incident, KB, & Slang Services (`services/`)**: Isolate system incidents, knowledge base FAQs, and slang databases. These modules encapsulate their own independent data stores (e.g. JSON files or separate databases) completely detached from the core queue database.
+
 
 ---
 
@@ -51,19 +57,19 @@ compass/
 │   └── js/
 │       └── app.js             # Form poster, real-time polling, and ReAct log viewer
 │
-├── services/                  # Database Adapters (To be implemented)
-│   ├── ticket/
-│   ├── incident/
-│   ├── kb/
-│   └── slang/
+├── services/                  # Business Domain Services (Separate data stores)
+│   ├── ticket/                # Ticket reader & writer repository adapter
+│   ├── incident/              # Live incident lookup service
+│   ├── kb/                    # Knowledge base FAQ query service
+│   └── slang/                 # Slang glossary lookup & feedback service
 │
 └── src/                       # Agent Core
     ├── index.js               # Entry point & Express routes
     ├── config.js              # Centralized configs and system prompts
     ├── database/
-    │   ├── sqlite.js          # SQLite database schema and helper functions
+    │   ├── sqlite.js          # SQLite queue database driver (infrastructural)
     │   └── __tests__/
-    │       └── sqlite.test.js # Database unit tests
+    │       └── sqlite.test.js # Queue driver unit tests
     │
     ├── worker/
     │   ├── pool.js            # Worker thread orchestrator
