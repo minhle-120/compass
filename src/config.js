@@ -5,7 +5,7 @@ export const config = {
   // Server & Queue Database Configuration
   port: parseInt(process.env.PORT || '3000', 10),
   get dbPath() {
-    return process.env.DB_PATH || './database.sqlite';
+    return process.env.DB_PATH || './data/database.sqlite';
   },
 
   concurrencyCap: 5,
@@ -52,4 +52,3 @@ Validation of your idle call depends dynamically on your selected "resolution_ty
 - "rejected": Blank, spam, off-topic, or invalid ticket. Requires only: read_ticket.
   `.trim()
 };
-

@@ -11,7 +11,7 @@ Compass utilizes a **Circular Agent** pattern. The AI agent communicates exclusi
 ```mermaid
 graph TD
     subgraph Management Level [Management Level - Parent Thread]
-        A[index.js - Express API] --> B[database.sqlite - SQLite Queue]
+        A[index.js - Express API] --> B[data/database.sqlite - SQLite Queue]
         B --> C[pool.js - Worker Pool]
       end
 
