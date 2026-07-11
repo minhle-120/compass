@@ -8,7 +8,7 @@ vi.mock('axios', () => ({
 }));
 
 const axios = (await import('axios')).default;
-const { initDb, insertTicket } = await import('../../database/sqlite.js');
+const { appendTicketMessage, initDb, insertTicket } = await import('../../database/sqlite.js');
 const { handler, schema } = await import('../inspect_ticket_attachments.js');
 
 describe('Inspect Ticket Attachments Tool', () => {
@@ -64,5 +64,25 @@ describe('Inspect Ticket Attachments Tool', () => {
       summary: 'No media attachments were supplied.'
     });
     expect(axios.post).not.toHaveBeenCalled();
+  });
+
+  it('inspects attachments added in a later player reply', async () => {
+    insertTicket({ id: 'T-REPLY-MEDIA', subject: 'Follow-up', description: 'See reply' });
+    appendTicketMessage('T-REPLY-MEDIA', 'player', 'New screenshot.', [{
+      name: 'reply.png',
+      type: 'image/png',
+      size: 1,
+      dataUrl: 'data:image/png;base64,YQ=='
+    }]);
+    axios.post.mockResolvedValue({
+      data: { choices: [{ message: { content: 'The reply screenshot shows an error.' } }] }
+    });
+
+    const result = await handler({}, { ticketId: 'T-REPLY-MEDIA' });
+    expect(result).toMatchObject({
+      summary: 'The reply screenshot shows an error.',
+      visuals_inspected: 1,
+      attachments: [{ name: 'reply.png', type: 'image/png' }]
+    });
   });
 });

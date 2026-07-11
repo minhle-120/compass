@@ -186,6 +186,30 @@ describe('SQLite Database Queue Layer', () => {
     expect(ticket.resolution_type).toBeNull();
   });
 
+  it('stores media attachments on a player reply', () => {
+    insertTicket({ id: 'T-REPLY-MEDIA', status: 'running', conversation: [] });
+    const attachment = {
+      name: 'follow-up.png',
+      type: 'image/png',
+      size: 1,
+      dataUrl: 'data:image/png;base64,YQ=='
+    };
+
+    appendTicketMessage('T-REPLY-MEDIA', 'player', 'Here is the screenshot.', [attachment]);
+
+    expect(getTicket('T-REPLY-MEDIA')).toMatchObject({
+      status: 'pending',
+      workflow_revision: 1,
+      conversation: [
+        expect.objectContaining({
+          sender: 'player',
+          message: 'Here is the screenshot.',
+          attachments: [attachment]
+        })
+      ]
+    });
+  });
+
   it('should archive the previous agent response before appending a player update', () => {
     insertTicket({ id: 'T-CONVERSATION', status: 'completed', conversation: [] });
     updateTicketDraft('T-CONVERSATION', 'Previous support response');

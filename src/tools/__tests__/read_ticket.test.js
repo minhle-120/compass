@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 // Set environment variable to run database in-memory for testing
 process.env.DB_PATH = ':memory:';
 
-import { initDb, insertTicket } from '../../database/sqlite.js';
+import { appendTicketMessage, initDb, insertTicket } from '../../database/sqlite.js';
 import { handler, schema } from '../read_ticket.js';
 
 describe('Read Ticket Tool', () => {
@@ -55,6 +55,26 @@ describe('Read Ticket Tool', () => {
       attachments: [],
       conversation: []
     });
+  });
+
+  it('reports reply attachment metadata without exposing media data to the agent context', async () => {
+    insertTicket({ id: 'T-REPLY-MEDIA', subject: 'Visual update', description: 'More evidence' });
+    appendTicketMessage('T-REPLY-MEDIA', 'player', 'Screenshot attached.', [{
+      name: 'evidence.png',
+      type: 'image/png',
+      size: 1,
+      dataUrl: 'data:image/png;base64,YQ=='
+    }]);
+
+    const result = await handler({}, { ticketId: 'T-REPLY-MEDIA' });
+    expect(result.attachments).toEqual([{
+      name: 'evidence.png',
+      type: 'image/png',
+      size: 1,
+      frame_count: 0
+    }]);
+    expect(result.conversation[0].attachments).toEqual(result.attachments);
+    expect(JSON.stringify(result)).not.toContain('data:image/png');
   });
 
   it('should throw error if ticket is not found in database', async () => {
