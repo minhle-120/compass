@@ -7,6 +7,8 @@ export function presentTicket(ticket, { staff = false } = {}) {
     presented.resolution_type = null;
     presented.resolution_reason = null;
     presented.status = 'awaiting_review';
+  } else if (presented.status === 'completed' && presented.resolution_type === 'needs_clarification') {
+    presented.status = 'needs_clarification';
   }
 
   return presented;

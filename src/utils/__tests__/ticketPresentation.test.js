@@ -28,4 +28,19 @@ describe('ticket presentation', () => {
     const published = { ...pendingReviewTicket, draft_response: null, draft_status: 'published' };
     expect(presentTicket(published)).toEqual(published);
   });
+
+  it('maps completed status to needs_clarification when resolution_type is needs_clarification', () => {
+    const needsClarificationTicket = {
+      id: 'T-CLARIFY',
+      status: 'completed',
+      draft_response: 'Internal draft',
+      draft_status: 'published',
+      resolution_type: 'needs_clarification',
+      resolution_reason: 'More info needed'
+    };
+    expect(presentTicket(needsClarificationTicket)).toMatchObject({
+      status: 'needs_clarification',
+      resolution_type: 'needs_clarification'
+    });
+  });
 });
