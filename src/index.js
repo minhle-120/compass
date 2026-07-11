@@ -2,6 +2,8 @@
 import express from 'express';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { readFileSync, existsSync } from 'fs';
+
 import { config } from './config.js';
 import { logger } from './utils/logger.js';
 import { initDb, resetInterruptedTickets, getTicket, insertTicket, getDb } from './database/sqlite.js';
@@ -64,6 +66,22 @@ app.get('/api/tickets/:id', (req, res) => {
     res.status(500).json({ error: 'Failed to retrieve ticket' });
   }
 });
+
+// API Endpoint to fetch raw conversation history trace from disk
+app.get('/api/tickets/:id/history', (req, res) => {
+  try {
+    const historyPath = join(config.historyDir, `${req.params.id}.json`);
+    if (!existsSync(historyPath)) {
+      return res.status(404).json({ error: 'History not found' });
+    }
+    const raw = readFileSync(historyPath, 'utf8');
+    res.json(JSON.parse(raw));
+  } catch (err) {
+    logger.error(`Failed to retrieve history for ticket ${req.params.id}`, 'ExpressAPI', err);
+    res.status(500).json({ error: 'Failed to retrieve history' });
+  }
+});
+
 
 // API Endpoint to submit a new ticket
 app.post('/api/tickets', (req, res) => {
