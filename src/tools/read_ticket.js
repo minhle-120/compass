@@ -4,7 +4,7 @@ export const schema = {
   type: 'function',
   function: {
     name: 'read_ticket',
-    description: 'Read the current ticket being processed. Returns ticket content, metadata, and status.',
+    description: 'Read the player-authored content for the current ticket: ID, subject, description, and conversation updates.',
     parameters: {
       type: 'object',
       properties: {}
@@ -18,6 +18,10 @@ export async function handler(args, sessionContext) {
   if (!ticket) {
     throw new Error(`Ticket "${ticketId}" not found in database.`);
   }
-  return JSON.stringify(ticket);
+  return {
+    id: ticket.id,
+    subject: ticket.subject || '',
+    description: ticket.description || '',
+    conversation: Array.isArray(ticket.conversation) ? ticket.conversation : []
+  };
 }
-

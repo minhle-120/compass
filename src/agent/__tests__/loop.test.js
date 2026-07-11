@@ -96,7 +96,9 @@ describe('Agent ReAct Loop', () => {
     const result = await runAgentLoop(sessionContext);
 
     expect(result.status).toBe('completed');
-    expect(finalizeTicket).toHaveBeenCalledWith(ticketId, 'completed', null, null);
+    expect(finalizeTicket).toHaveBeenCalledWith(ticketId, 'completed', null, null, {
+      draftResponseMode: config.draftResponseMode
+    });
     expect(executeTool).toHaveBeenCalledTimes(2);
     expect(executeTool).toHaveBeenNthCalledWith(1, 'read_ticket', {}, sessionContext);
     expect(executeTool).toHaveBeenNthCalledWith(2, 'idle', { resolution_type: 'resolved', reason: 'All tasks completed' }, sessionContext);
@@ -133,7 +135,9 @@ describe('Agent ReAct Loop', () => {
     const result = await runAgentLoop(sessionContext);
 
     expect(result.status).toBe('escalated');
-    expect(finalizeTicket).toHaveBeenCalledWith(ticketId, 'escalated', 'escalated', 'Context token limit reached');
+    expect(finalizeTicket).toHaveBeenCalledWith(ticketId, 'escalated', 'escalated', 'Context token limit reached', {
+      draftResponseMode: config.draftResponseMode
+    });
     
     // Verify system message added about halting
     const history = JSON.parse(readFileSync(historyFilePath, 'utf8'));
@@ -286,7 +290,9 @@ describe('Agent ReAct Loop', () => {
     const result = await runAgentLoop(sessionContext);
 
     expect(result.status).toBe('completed');
-    expect(finalizeTicket).toHaveBeenCalledWith(ticketId, 'completed', null, null);
+    expect(finalizeTicket).toHaveBeenCalledWith(ticketId, 'completed', null, null, {
+      draftResponseMode: config.draftResponseMode
+    });
     expect(executeTool).toHaveBeenCalledTimes(2);
     expect(executeTool).toHaveBeenNthCalledWith(1, 'read_ticket', {}, sessionContext);
     expect(executeTool).toHaveBeenNthCalledWith(2, 'idle', { resolution_type: 'resolved', reason: 'All tasks completed' }, sessionContext);

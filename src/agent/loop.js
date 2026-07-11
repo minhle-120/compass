@@ -408,7 +408,8 @@ export async function runAgentLoop(sessionContext) {
     ticketId,
     exitStatus,
     sessionContext.resolutionType || (exitStatus === 'escalated' ? 'escalated' : null),
-    sessionContext.resolutionReason || (exitStatus === 'escalated' ? 'Context token limit reached' : null)
+    sessionContext.resolutionReason || (exitStatus === 'escalated' ? 'Context token limit reached' : null),
+    { draftResponseMode: config.draftResponseMode }
   );
   return { status: finalized.status, finalized: finalized.finalized };
 }

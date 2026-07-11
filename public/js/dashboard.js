@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const detailTitle = document.getElementById('detail-title');
   const detailFields = document.getElementById('detail-fields');
   const detailHistory = document.getElementById('detail-history');
+  const detailActions = document.getElementById('detail-actions');
   const detailClose = document.getElementById('detail-close');
 
   // Close detail panel
@@ -147,10 +148,12 @@ document.addEventListener('DOMContentLoaded', () => {
     detailTitle.textContent = ticketId;
     detailFields.innerHTML = '<dd>Loading…</dd>';
     detailHistory.innerHTML = '<div class="text-muted">Loading…</div>';
+    detailActions.style.display = 'none';
+    detailActions.innerHTML = '';
 
     // Fetch ticket detail
     try {
-      const res = await fetch(`/api/tickets/${ticketId}`);
+      const res = await fetch(`/api/tickets/${ticketId}?staff=true`);
       const t = await res.json();
 
       const fields = [
@@ -160,6 +163,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ['Severity', t.severity], ['Rationale', t.rationale],
         ['Routing', t.routing_destination], ['Routing Reason', t.routing_reason],
         ['Draft Response', t.draft_response],
+        ['Draft Status', t.draft_status],
         ['Error', t.error_message],
         ['Created', t.created_at], ['Updated', t.updated_at]
       ];
@@ -167,6 +171,25 @@ document.addEventListener('DOMContentLoaded', () => {
       detailFields.innerHTML = fields.map(([label, val]) =>
         `<dt>${esc(label)}</dt><dd>${esc(val != null ? String(val) : '–')}</dd>`
       ).join('');
+
+      if (t.draft_status === 'pending_review' && t.draft_response) {
+        detailActions.style.display = 'block';
+        detailActions.innerHTML = '<button class="btn btn-primary" id="approve-draft">Approve & Send Response</button>';
+        document.getElementById('approve-draft').addEventListener('click', async () => {
+          const button = document.getElementById('approve-draft');
+          button.disabled = true;
+          button.textContent = 'Publishing…';
+          const response = await fetch(`/api/tickets/${encodeURIComponent(ticketId)}/draft/approve`, { method: 'POST' });
+          if (response.ok) {
+            await openDetail(ticketId);
+            await fetchTickets();
+          } else {
+            const error = await response.json().catch(() => ({}));
+            button.disabled = false;
+            button.textContent = error.error || 'Approval failed';
+          }
+        });
+      }
     } catch (err) {
       detailFields.innerHTML = '<dd>Failed to load ticket.</dd>';
     }

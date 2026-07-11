@@ -8,7 +8,8 @@ import { config } from './config.js';
 import { logger } from './utils/logger.js';
 import { isValidTicketId } from './utils/ticketId.js';
 import { normalizeTicketSubmission } from './utils/ticketSubmission.js';
-import { initDb, resetInterruptedTickets, getTicket, insertTicket, getDb, getQueueStats, appendTicketMessage } from './database/sqlite.js';
+import { presentTicket } from './utils/ticketPresentation.js';
+import { initDb, resetInterruptedTickets, getTicket, insertTicket, getDb, getQueueStats, appendTicketMessage, publishDraftResponse } from './database/sqlite.js';
 import { pool } from './worker/pool.js';
 
 
@@ -45,7 +46,7 @@ app.get('/api/tickets', (req, res) => {
       if (copy.categories) {
         try { copy.categories = JSON.parse(copy.categories); } catch (e) {}
       }
-      return copy;
+      return presentTicket(copy);
     });
 
     res.json(tickets);
@@ -85,10 +86,26 @@ app.get('/api/tickets/:id', (req, res) => {
     if (!ticket) {
       return res.status(404).json({ error: 'Ticket not found' });
     }
-    res.json(ticket);
+    res.json(presentTicket(ticket, { staff: req.query.staff === 'true' }));
   } catch (err) {
     logger.error(`Failed to retrieve ticket ${req.params.id}`, 'ExpressAPI', err);
     res.status(500).json({ error: 'Failed to retrieve ticket' });
+  }
+});
+
+// Staff action to approve and publish a pending AI draft.
+app.post('/api/tickets/:id/draft/approve', (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!isValidTicketId(id)) return res.status(400).json({ error: 'Invalid ticket ID' });
+    if (!getTicket(id)) return res.status(404).json({ error: 'Ticket not found' });
+
+    const result = publishDraftResponse(id);
+    if (!result.published) return res.status(409).json({ error: result.reason });
+    return res.json({ message: 'Draft response published', ticketId: id });
+  } catch (err) {
+    logger.error(`Failed to approve draft for ticket ${req.params.id}`, 'ExpressAPI', err);
+    return res.status(500).json({ error: 'Failed to approve draft response' });
   }
 });
 

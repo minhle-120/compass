@@ -135,6 +135,10 @@ The system supports switching between standard OpenAI API and a local model runn
 * **OpenAI mode**: Resolves `https://api.openai.com/v1/chat/completions` using the `OPENAI_API_KEY` header.
 * **Llama.cpp mode**: Resolves `${LLAMACPP_URL}/v1/chat/completions` (default `http://localhost:8080`), uses longer request timeouts (120 seconds) for slow local hardware, and does not require an API key to run.
 
+### Draft response delivery
+
+Set `DRAFT_RESPONSE_MODE=auto_response` to publish finalized drafts directly into the player conversation. The default, `staff_review`, keeps drafts internal with a `pending_review` status until staff approves them from the dashboard.
+
 ---
 
 ## 5. Development & Running Tests

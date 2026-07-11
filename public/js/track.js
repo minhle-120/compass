@@ -76,7 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       // Stop polling once ticket has a terminal status
-      if (ticket.status !== 'pending' && ticket.status !== 'running' && pollInterval) {
+      if (!['pending', 'running', 'awaiting_review'].includes(ticket.status) && pollInterval) {
         clearInterval(pollInterval);
         pollInterval = null;
       }
@@ -119,7 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const fullMessages = [initialMsg, ...conversationList];
-    if (ticket.draft_response && ticket.status !== 'pending' && ticket.status !== 'running') {
+    if (ticket.draft_response && ticket.draft_status !== 'pending_review' && ticket.status !== 'pending' && ticket.status !== 'running') {
       fullMessages.push({
         sender: 'agent',
         timestamp: ticket.updated_at || ticket.created_at || new Date().toISOString(),

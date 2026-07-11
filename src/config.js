@@ -1,6 +1,10 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+export function resolveDraftResponseMode(value) {
+  return value === 'auto_response' ? 'auto_response' : 'staff_review';
+}
+
 export const config = {
   // Server & Queue Database Configuration
   port: parseInt(process.env.PORT || '3000', 10),
@@ -17,6 +21,7 @@ export const config = {
   // LLM Orchestration Settings
   llmProvider: process.env.LLM_PROVIDER || 'openai',
   contextTokenBudget: 60000,
+  draftResponseMode: resolveDraftResponseMode(process.env.DRAFT_RESPONSE_MODE),
 
   // OpenAI Cloud API Configuration
   openaiApiKey: process.env.OPENAI_API_KEY,

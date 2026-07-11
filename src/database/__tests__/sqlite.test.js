@@ -15,7 +15,8 @@ import {
   resetInterruptedTickets,
   getQueueStats,
   finalizeTicket,
-  appendTicketMessage
+  appendTicketMessage,
+  publishDraftResponse
 } from '../sqlite.js';
 
 
@@ -232,5 +233,76 @@ describe('SQLite Database Queue Layer', () => {
   it('should throw when finalizing a missing ticket', () => {
     expect(() => finalizeTicket('T-MISSING', 'completed', 'resolved', 'Done'))
       .toThrow('not found during finalization');
+  });
+
+  it('should publish a finalized draft automatically in auto-response mode', () => {
+    insertTicket({ id: 'T-AUTO-DRAFT', status: 'running', conversation: [] });
+    updateTicketDraft('T-AUTO-DRAFT', 'Automatic answer');
+
+    finalizeTicket('T-AUTO-DRAFT', 'completed', 'resolved', 'Answered', {
+      draftResponseMode: 'auto_response'
+    });
+
+    expect(getTicket('T-AUTO-DRAFT')).toMatchObject({
+      draft_response: null,
+      draft_status: 'published',
+      conversation: [
+        expect.objectContaining({ sender: 'agent', message: 'Automatic answer' })
+      ]
+    });
+  });
+
+  it('should hold a finalized draft until staff approval in review mode', () => {
+    insertTicket({ id: 'T-REVIEW-DRAFT', status: 'running', conversation: [] });
+    updateTicketDraft('T-REVIEW-DRAFT', 'Reviewed answer');
+
+    finalizeTicket('T-REVIEW-DRAFT', 'completed', 'resolved', 'Answered', {
+      draftResponseMode: 'staff_review'
+    });
+    expect(getTicket('T-REVIEW-DRAFT')).toMatchObject({
+      draft_response: 'Reviewed answer',
+      draft_status: 'pending_review',
+      conversation: []
+    });
+
+    expect(publishDraftResponse('T-REVIEW-DRAFT')).toEqual({ published: true });
+    expect(getTicket('T-REVIEW-DRAFT')).toMatchObject({
+      draft_response: null,
+      draft_status: 'published',
+      conversation: [
+        expect.objectContaining({ sender: 'agent', message: 'Reviewed answer' })
+      ]
+    });
+  });
+
+  it('should not publish a draft more than once', () => {
+    insertTicket({ id: 'T-NO-DRAFT', status: 'completed', conversation: [] });
+    expect(publishDraftResponse('T-NO-DRAFT')).toEqual({
+      published: false,
+      reason: 'No draft is awaiting staff review.'
+    });
+  });
+
+  it('should cancel rather than expose a pending-review draft when the player replies', () => {
+    insertTicket({ id: 'T-REVIEW-REPLY', status: 'running', conversation: [] });
+    updateTicketDraft('T-REVIEW-REPLY', 'Draft awaiting approval');
+    finalizeTicket('T-REVIEW-REPLY', 'completed', 'resolved', 'Answered', {
+      draftResponseMode: 'staff_review'
+    });
+
+    appendTicketMessage('T-REVIEW-REPLY', 'player', 'I have more information');
+
+    expect(getTicket('T-REVIEW-REPLY')).toMatchObject({
+      status: 'pending',
+      draft_response: null,
+      draft_status: null,
+      conversation: [
+        expect.objectContaining({ sender: 'player', message: 'I have more information' })
+      ]
+    });
+  });
+
+  it('should reject staff approval for a missing ticket', () => {
+    expect(() => publishDraftResponse('T-MISSING')).toThrow('Ticket "T-MISSING" not found');
   });
 });
