@@ -2,12 +2,12 @@
   "schema_version": 1,
   "source": "https://valorant-api.com",
   "retrieved_at": "2026-07-11T11:18:05.135Z",
-  "entry_count": 216,
+  "entry_count": 215,
   "category_counts": {
     "agent": 29,
     "ability": 92,
     "ultimate": 29,
-    "map": 26,
+    "map": 25,
     "weapon": 20,
     "mechanic": 20
   },
@@ -871,11 +871,6 @@
       "term": "Icebox",
       "category": "map",
       "explanation": "A/B Sites\n\nLocation: 76°44' A\"N 149°30' Z\"E.\n\nNamed callout regions: Garage, Belt, Nest, Pipes, Rafters, Screen, Site, Spawn, Yellow, Back, Cubby, Green, Hall, Hut, Kitchen, Orange, Snowman, Snow Pile, Tube, Blue, Boiler, Pallet, Fence."
-    },
-    {
-      "term": "The Range",
-      "category": "map",
-      "explanation": "Location: 45°26'FF'N,12°20'Q'E."
     },
     {
       "term": "The Range",

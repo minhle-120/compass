@@ -204,7 +204,7 @@ export function readBundledWikiSnapshot() {
       sources: snapshots.map((snapshot) => snapshot.metadata.source).filter(Boolean),
       retrieved_at: snapshots.map((snapshot) => snapshot.metadata.retrieved_at).filter(Boolean).sort().at(-1) || null
     },
-    entries: snapshots.flatMap((snapshot) => snapshot.entries)
+    entries: deduplicateEntries(snapshots.flatMap((snapshot) => snapshot.entries))
   };
 }
 
@@ -271,6 +271,25 @@ function validateEntry(input) {
   if (explanation.length > 10000) throw new WikiValidationError('Explanation must be 10,000 characters or fewer.');
 
   return { term, explanation, category };
+}
+
+function deduplicateEntries(entries) {
+  const unique = new Map();
+  for (const entry of entries) {
+    const key = String(entry?.term || '').trim().toLowerCase();
+    if (!key) continue;
+
+    const existing = unique.get(key);
+    if (!existing || preferEntry(entry, existing)) unique.set(key, entry);
+  }
+  return [...unique.values()];
+}
+
+function preferEntry(candidate, existing) {
+  const candidateCategory = WIKI_CATEGORIES.includes(candidate?.category) ? candidate.category : 'mechanic';
+  const existingCategory = WIKI_CATEGORIES.includes(existing?.category) ? existing.category : 'mechanic';
+  if (candidateCategory !== 'mechanic' && existingCategory === 'mechanic') return true;
+  return String(candidate?.explanation || '').length > String(existing?.explanation || '').length;
 }
 
 function scoreEntry(entry, query) {

@@ -34,7 +34,10 @@ async function mockCatalogFetch(input) {
       ]
     }));
   } else if (url.pathname.endsWith('/maps')) {
-    data = Array.from({ length: 10 }, (_, index) => ({ displayName: `Map ${index}`, tacticalDescription: 'Two sites.' }));
+    data = Array.from({ length: 11 }, (_, index) => ({
+      displayName: `Map ${index === 10 ? 0 : index}`,
+      tacticalDescription: 'Two sites.'
+    }));
   } else if (url.pathname.endsWith('/weapons')) {
     data = Array.from({ length: 15 }, (_, index) => ({
       displayName: `Weapon ${index}`,

@@ -23,13 +23,13 @@ export async function downloadValorantCatalog(options = {}) {
   const weapons = arrayData(weaponsPayload, 'weapons');
   const gameModes = arrayData(gameModesPayload, 'game modes');
   const gear = arrayData(gearPayload, 'gear');
-  const entries = [
+  const entries = deduplicateEntries([
     ...agents.flatMap(mapAgentEntries),
     ...maps.map(mapMapEntry).filter(Boolean),
     ...weapons.map(mapWeaponEntry).filter(Boolean),
     ...gameModes.map(mapGameModeEntry).filter(Boolean),
     ...gear.map(mapGearEntry).filter(Boolean)
-  ];
+  ]);
 
   const counts = countCategories(entries);
   if (counts.agent < 20 || counts.map < 10 || counts.weapon < 15 || counts.ability + counts.ultimate < 80) {
@@ -184,6 +184,16 @@ function countCategories(entries) {
     counts[entry.category] = (counts[entry.category] || 0) + 1;
     return counts;
   }, { agent: 0, ability: 0, ultimate: 0, map: 0, weapon: 0, mechanic: 0 });
+}
+
+function deduplicateEntries(entries) {
+  const unique = new Map();
+  for (const entry of entries) {
+    const key = String(entry.term || '').trim().toLowerCase();
+    const existing = unique.get(key);
+    if (!existing || entry.explanation.length > existing.explanation.length) unique.set(key, entry);
+  }
+  return [...unique.values()];
 }
 
 function joinParagraphs(values) {
