@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const submitBtn = document.getElementById('submit-btn');
 
   function showFlash(message, type) {
-    flash.textContent = message;
+    flash.innerHTML = message;
     flash.className = `flash flash-${type}`;
     flash.style.display = 'block';
     setTimeout(() => { flash.style.display = 'none'; }, 5000);
@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await res.json();
 
       if (res.ok) {
-        showFlash(`Ticket ${data.ticketId} submitted successfully.`, 'success');
+        showFlash(`Ticket ${data.ticketId} submitted successfully. <a href="/track.html?id=${encodeURIComponent(data.ticketId)}" style="color: inherit; text-decoration: underline; font-weight: 600;">Track conversation here</a>`, 'success');
         form.reset();
       } else {
         showFlash(data.error || 'Submission failed.', 'error');
