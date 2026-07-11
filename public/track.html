@@ -17,7 +17,7 @@
       bottom: 0;
       left: 20px;
       width: 2px;
-      background-color: var(--color-border);
+      background-color: var(--line);
       z-index: 1;
     }
     .ticket-timeline-item {
@@ -29,33 +29,33 @@
     .ticket-timeline-avatar {
       width: 40px;
       height: 40px;
-      border-radius: 50%;
-      background-color: var(--color-bg-subtle);
-      border: 1px solid var(--color-border);
+      background-color: var(--paper-bright);
+      border: 1px solid var(--ink);
       display: flex;
       align-items: center;
       justify-content: center;
+      font-family: var(--mono);
       font-weight: 600;
       margin-right: 16px;
       flex-shrink: 0;
       font-size: 14px;
-      color: var(--color-fg-muted);
+      color: var(--ink-soft);
     }
     .ticket-timeline-content {
       flex-grow: 1;
-      border: 1px solid var(--color-border);
-      border-radius: 6px;
-      background-color: var(--color-bg);
+      border: 1px solid var(--ink);
+      background-color: var(--paper-bright);
       overflow: hidden;
     }
     .ticket-timeline-header {
-      background-color: var(--color-bg-subtle);
+      background-color: var(--paper);
       padding: 8px 16px;
-      border-bottom: 1px solid var(--color-border);
+      border-bottom: 1px solid var(--ink);
+      font-family: var(--mono);
       font-size: 13px;
       display: flex;
       justify-content: space-between;
-      color: var(--color-fg-muted);
+      color: var(--ink-soft);
     }
     .ticket-timeline-body {
       padding: 16px;
@@ -64,35 +64,16 @@
       white-space: pre-wrap;
     }
     .ticket-timeline-item.agent .ticket-timeline-avatar {
-      background-color: #2da44e;
-      color: #ffffff;
-      border-color: #2da44e;
+      background-color: var(--aqua);
+      color: var(--ink);
+      border-color: var(--ink);
     }
     .ticket-timeline-item.agent .ticket-timeline-content {
-      border-color: rgba(45, 164, 78, 0.4);
+      border-color: var(--ink);
     }
     .ticket-timeline-item.agent .ticket-timeline-header {
-      background-color: rgba(45, 164, 78, 0.05);
-      border-bottom-color: rgba(45, 164, 78, 0.2);
+      background-color: rgba(185, 229, 220, .35);
     }
-    .status-badge {
-      display: inline-flex;
-      align-items: center;
-      font-size: 12px;
-      font-weight: 500;
-      padding: 4px 10px;
-      border-radius: 12px;
-      text-transform: capitalize;
-    }
-    .status-pending { background-color: var(--color-bg-subtle); color: var(--color-fg-muted); border: 1px solid var(--color-border); }
-    .status-running { background-color: #ddf4ff; color: #0969da; border: 1px solid rgba(9, 105, 218, 0.2); }
-    .status-awaiting_review { background-color: #fff8c5; color: #9a6700; border: 1px solid rgba(154, 103, 0, 0.2); }
-    .status-completed { background-color: #dafbe1; color: #1a7f37; border: 1px solid rgba(26, 127, 55, 0.2); }
-    .status-escalated { background-color: #fbe5ff; color: #8250df; border: 1px solid rgba(130, 80, 223, 0.2); }
-    .status-failed { background-color: #ffebe9; color: #cf222e; border: 1px solid rgba(207, 34, 46, 0.2); }
-    .status-resolved { background-color: #dafbe1; color: #1a7f37; border: 1px solid rgba(26, 127, 55, 0.2); }
-    .status-needs_clarification { background-color: #fff8c5; color: #9a6700; border: 1px solid rgba(154, 103, 0, 0.2); }
-    .status-rejected { background-color: #ffebe9; color: #cf222e; border: 1px solid rgba(207, 34, 46, 0.2); }
   </style>
   <script src="/js/theme.js"></script>
 </head>
@@ -102,13 +83,15 @@
       <a href="/" class="header-logo">⊙ Compass</a>
       <nav class="header-nav">
         <a href="/submit.html">Submit Ticket</a>
+        <a href="/tickets.html">Browse Tickets</a>
         <a href="/dashboard.html">Dashboard</a>
         <a href="/wiki">Wiki</a>
+        <a href="/flags">Flagged Words</a>
       </nav>
     </div>
     <div class="header-right">
       <button id="theme-toggle" class="btn btn-sm" aria-label="Toggle theme" style="padding: 4px 8px; line-height: 1;">
-        <span class="theme-toggle-icon">🌙</span>
+        <span class="theme-toggle-icon">Dark</span>
       </button>
     </div>
   </header>

@@ -12,11 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function updateToggleIcon(theme) {
     const iconSpan = toggleBtn.querySelector('.theme-toggle-icon') || toggleBtn;
-    if (theme === 'dark') {
-      iconSpan.textContent = '☀️';
-    } else {
-      iconSpan.textContent = '🌙';
-    }
+    iconSpan.textContent = theme === 'dark' ? 'Light' : 'Dark';
   }
 
   const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';

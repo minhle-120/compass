@@ -1,8 +1,9 @@
 // src/worker/agentWorker.js
 import { parentPort, workerData } from 'worker_threads';
-import { getTicket, updateTicketStatus } from '../database/sqlite.js';
+import { failRunningTicket, getTicket } from '../database/sqlite.js';
 import { runAgentLoop } from '../agent/loop.js';
 import { logger } from '../utils/logger.js';
+import { errorMessage } from '../utils/errorMessage.js';
 
 const { ticketId } = workerData;
 
@@ -49,7 +50,7 @@ async function start() {
     
     // Update ticket state in database to failed
     try {
-      updateTicketStatus(ticketId, 'failed', err.message || String(err));
+      failRunningTicket(ticketId, errorMessage(err));
     } catch (dbErr) {
       logger.error('Failed to update ticket status to failed in database', `Ticket-${ticketId}`, dbErr);
     }

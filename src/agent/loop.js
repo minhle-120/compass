@@ -4,6 +4,7 @@ import { join, dirname } from 'path';
 import axios from 'axios';
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
+import { errorMessage } from '../utils/errorMessage.js';
 import { assertValidTicketId } from '../utils/ticketId.js';
 import { hasExactKnowledgeMatch, normalizeUnknownWord } from '../utils/unknownWord.js';
 import { finalizeTicket } from '../database/sqlite.js';
@@ -296,7 +297,7 @@ export async function runAgentLoop(sessionContext) {
         config.llmProvider.toUpperCase()
       );
     } catch (apiErr) {
-      const errorMsg = apiErr.response?.data?.error?.message || apiErr.message || String(apiErr);
+      const errorMsg = errorMessage(apiErr, 'Unknown LLM provider error');
       logger.error(`${config.llmProvider.toUpperCase()} API request failed`, `Ticket-${ticketId}`, apiErr);
       throw new Error(`${config.llmProvider.toUpperCase()} API error: ${errorMsg}`);
     }

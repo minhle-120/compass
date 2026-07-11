@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import Database from 'better-sqlite3';
 
 // Set environment variable to run database in-memory for testing
 process.env.DB_PATH = ':memory:';
@@ -8,6 +9,7 @@ import {
   insertTicket, 
   getTicket, 
   updateTicketStatus, 
+  failRunningTicket,
   updateTicketClassification, 
   updateTicketRouting, 
   updateTicketDraft, 
@@ -16,7 +18,8 @@ import {
   getQueueStats,
   finalizeTicket,
   appendTicketMessage,
-  publishDraftResponse
+  publishDraftResponse,
+  migrateTicketSchema
 } from '../sqlite.js';
 
 
@@ -224,6 +227,31 @@ describe('SQLite Database Queue Layer', () => {
       status: 'completed',
       resolution_type: 'resolved',
       resolution_reason: 'Answered'
+    });
+  });
+
+  it('should migrate resolution_type into a legacy tickets table', () => {
+    const legacyDb = new Database(':memory:');
+    legacyDb.exec('CREATE TABLE tickets (id TEXT PRIMARY KEY, status TEXT)');
+
+    migrateTicketSchema(legacyDb);
+
+    const columns = legacyDb.prepare('PRAGMA table_info(tickets)').all().map((column) => column.name);
+    expect(columns).toEqual(expect.arrayContaining([
+      'resolution_type', 'resolution_reason', 'workflow_revision', 'draft_status'
+    ]));
+    legacyDb.close();
+  });
+
+  it('should never overwrite a completed ticket with a late worker failure', () => {
+    insertTicket({ id: 'T-LATE-ERROR', status: 'running' });
+    finalizeTicket('T-LATE-ERROR', 'completed', 'resolved', 'Answered');
+
+    expect(failRunningTicket('T-LATE-ERROR', 'Late worker error')).toBe(false);
+    expect(getTicket('T-LATE-ERROR')).toMatchObject({
+      status: 'completed',
+      error_message: null,
+      resolution_type: 'resolved'
     });
   });
 

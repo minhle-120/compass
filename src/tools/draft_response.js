@@ -5,7 +5,7 @@ export const schema = {
   type: 'function',
   function: {
     name: 'draft_response',
-    description: 'Draft a contextual response to the ticket based on the game knowledge base, incident information, and ticket classification. Generates a reply that addresses the player\'s issue.',
+    description: 'Draft a contextual response to the ticket based on the game knowledge base, incident information, and ticket classification. Generates a reply that addresses the player\'s issue. The response must be formal, without telling the player what each word mean. ',
     parameters: {
       type: 'object',
       properties: {

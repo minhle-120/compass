@@ -1,5 +1,6 @@
 // src/utils/logger.js
 import { isMainThread, threadId } from 'worker_threads';
+import { errorMessage } from './errorMessage.js';
 
 const colors = {
   reset: '\x1b[0m',
@@ -32,7 +33,7 @@ export const logger = {
   error(message, context, err) {
     let msg = message;
     if (err) {
-      msg += ` - ${err.stack || err.message || err}`;
+      msg += ` - ${err.stack || errorMessage(err)}`;
     }
     console.error(formatMessage('error', msg, context));
   }
