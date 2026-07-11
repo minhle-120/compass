@@ -5,7 +5,7 @@ export const schema = {
   type: 'function',
   function: {
     name: 'get_knowledge_base_article',
-    description: 'Retrieve a complete entry from the editable local Compass Wiki or the current Gen-Z slang dataset using an ID returned by search_knowledge_base.',
+    description: 'Retrieve a complete entry from the editable local Compass Wiki or any slang source using an ID returned by search_knowledge_base.',
     parameters: {
       type: 'object',
       properties: {
@@ -61,10 +61,12 @@ export async function handler(args, sessionContext) {
         summary: row.description,
         excerpt: row.example,
         content: formatSlangContent(row),
-        source: 'huggingface_genz_slang',
+        source: row.source,
         source_dataset: row.source_dataset,
+        source_url: row.source_url,
         example: row.example,
-        context: row.context
+        context: row.context,
+        category: row.category
       };
     }
 

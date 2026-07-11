@@ -18,7 +18,13 @@ export async function handler(args, sessionContext) {
   const ticket = getTicket(sessionContext.ticketId);
   if (!ticket) throw new Error(`Ticket "${sessionContext.ticketId}" not found in database.`);
 
-  const attachments = Array.isArray(ticket.attachments) ? ticket.attachments : [];
+  const conversationAttachments = Array.isArray(ticket.conversation)
+    ? ticket.conversation.flatMap((message) => Array.isArray(message.attachments) ? message.attachments : [])
+    : [];
+  const attachments = [
+    ...(Array.isArray(ticket.attachments) ? ticket.attachments : []),
+    ...conversationAttachments
+  ];
   if (attachments.length === 0) return { summary: 'No media attachments were supplied.', attachments: [] };
 
   const content = [{

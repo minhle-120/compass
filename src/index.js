@@ -7,7 +7,7 @@ import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { config } from './config.js';
 import { logger } from './utils/logger.js';
 import { isValidTicketId } from './utils/ticketId.js';
-import { normalizeTicketSubmission } from './utils/ticketSubmission.js';
+import { normalizeAttachments, normalizeTicketSubmission } from './utils/ticketSubmission.js';
 import { presentTicket } from './utils/ticketPresentation.js';
 import { initDb, resetInterruptedTickets, getTicket, insertTicket, getDb, getQueueStats, appendTicketMessage, publishDraftResponse, closeTicketByUser, getIncidentTicketSummary } from './database/sqlite.js';
 import { deleteResolvedTicket, TicketDeletionError } from './services/ticketDeletion.js';
@@ -26,6 +26,16 @@ import {
   updateWikiEntry
 } from '../services/wiki/wikiService.js';
 import { startWikiSync } from '../services/wiki/sync.js';
+import {
+  SlangValidationError,
+  createLocalSlangEntry,
+  deleteLocalSlangEntry,
+  getLocalSlangEntry,
+  getSlangStats,
+  initSlangDb,
+  listLocalSlangEntries,
+  updateLocalSlangEntry
+} from '../services/slang/slangService.js';
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -34,6 +44,7 @@ const __dirname = dirname(__filename);
 initDb();
 resetInterruptedTickets();
 initWikiDb();
+initSlangDb();
 startWikiSync();
 
 // Start worker thread pool
@@ -47,6 +58,10 @@ app.use(express.static(join(__dirname, '../public')));
 
 app.get('/wiki', (req, res) => {
   res.sendFile(join(__dirname, '../public/wiki.html'));
+});
+
+app.get('/slang', (req, res) => {
+  res.sendFile(join(__dirname, '../public/slang.html'));
 });
 
 app.get('/flags', (req, res) => {
@@ -133,6 +148,66 @@ app.delete('/api/wiki/:id', (req, res) => {
     res.status(204).end();
   } catch (error) {
     sendWikiError(res, error, 'delete wiki entry');
+  }
+});
+
+app.get('/api/slang', (req, res) => {
+  try {
+    res.json(listLocalSlangEntries({
+      query: req.query.query || '',
+      category: req.query.category || '',
+      limit: req.query.limit,
+      offset: req.query.offset
+    }));
+  } catch (error) {
+    sendSlangError(res, error, 'list slang entries');
+  }
+});
+
+app.get('/api/slang/stats', (req, res) => {
+  try {
+    res.json(getSlangStats());
+  } catch (error) {
+    sendSlangError(res, error, 'retrieve slang statistics');
+  }
+});
+
+app.get('/api/slang/:id', (req, res) => {
+  try {
+    const entry = getLocalSlangEntry(req.params.id);
+    if (!entry) return res.status(404).json({ error: 'Slang entry not found.' });
+    res.json(entry);
+  } catch (error) {
+    sendSlangError(res, error, 'retrieve slang entry');
+  }
+});
+
+app.post('/api/slang', (req, res) => {
+  try {
+    res.status(201).json(createLocalSlangEntry(req.body));
+  } catch (error) {
+    sendSlangError(res, error, 'create slang entry');
+  }
+});
+
+app.put('/api/slang/:id', (req, res) => {
+  try {
+    const entry = updateLocalSlangEntry(req.params.id, req.body);
+    if (!entry) return res.status(404).json({ error: 'Slang entry not found.' });
+    res.json(entry);
+  } catch (error) {
+    sendSlangError(res, error, 'update slang entry');
+  }
+});
+
+app.delete('/api/slang/:id', (req, res) => {
+  try {
+    if (!deleteLocalSlangEntry(req.params.id)) {
+      return res.status(404).json({ error: 'Slang entry not found.' });
+    }
+    res.status(204).end();
+  } catch (error) {
+    sendSlangError(res, error, 'delete slang entry');
   }
 });
 
@@ -292,11 +367,13 @@ app.get('/api/tickets/:id/history', (req, res) => {
 app.post('/api/tickets/:id/messages', (req, res) => {
   try {
     const { id } = req.params;
-    const { sender, message } = req.body;
+    const { sender, message } = req.body || {};
+    const attachments = normalizeAttachments(req.body?.attachments);
+    const normalizedMessage = typeof message === 'string' ? message.trim() : '';
 
     // Validate inputs
-    if (!message || typeof message !== 'string' || !message.trim()) {
-      return res.status(400).json({ error: 'A valid string message content is required' });
+    if (!normalizedMessage && attachments.length === 0) {
+      return res.status(400).json({ error: 'A message or at least one attachment is required' });
     }
     if (sender && (typeof sender !== 'string' || !sender.trim())) {
       return res.status(400).json({ error: 'Sender must be a valid string if provided' });
@@ -318,7 +395,12 @@ app.post('/api/tickets/:id/messages', (req, res) => {
       return res.status(409).json({ error: 'This ticket is closed and cannot receive new replies.' });
     }
 
-    appendTicketMessage(id, sender || 'player', message.trim());
+    appendTicketMessage(
+      id,
+      sender || 'player',
+      normalizedMessage || 'Added attachment(s).',
+      attachments
+    );
 
     logger.info(`Received player reply for ticket ${id}. Resetting status to pending.`, 'ExpressAPI');
 
@@ -327,6 +409,9 @@ app.post('/api/tickets/:id/messages', (req, res) => {
 
     res.json({ message: 'Reply added successfully', ticketId: id });
   } catch (err) {
+    if (err instanceof TypeError) {
+      return res.status(400).json({ error: err.message });
+    }
     logger.error(`Failed to process player reply for ticket ${req.params.id}`, 'ExpressAPI', err);
     res.status(500).json({ error: 'Failed to process player reply' });
   }
@@ -363,6 +448,18 @@ function sendWikiError(res, error, action) {
   }
 
   logger.error(`Failed to ${action}`, 'WikiAPI', error);
+  return res.status(500).json({ error: `Failed to ${action}.` });
+}
+
+function sendSlangError(res, error, action) {
+  if (error instanceof SlangValidationError) {
+    return res.status(400).json({ error: error.message });
+  }
+  if (error?.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+    return res.status(409).json({ error: 'A slang entry with that term already exists.' });
+  }
+
+  logger.error(`Failed to ${action}`, 'SlangAPI', error);
   return res.status(500).json({ error: `Failed to ${action}.` });
 }
 

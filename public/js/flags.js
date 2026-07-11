@@ -9,10 +9,31 @@ const elements = {
   addDialog: document.getElementById('add-word-dialog'),
   addForm: document.getElementById('add-word-form'),
   addTerm: document.getElementById('add-word-term'),
+  addTarget: document.getElementById('add-word-target'),
   addCategory: document.getElementById('add-word-category'),
   addExplanation: document.getElementById('add-word-explanation'),
   cancelAdd: document.getElementById('cancel-add-word'),
   publishAdd: document.getElementById('publish-add-word')
+};
+
+const CATEGORY_OPTIONS = {
+  slang: [
+    ['general', 'General'],
+    ['gaming', 'Gaming'],
+    ['chat', 'Chat'],
+    ['meme', 'Meme'],
+    ['platform', 'Platform'],
+    ['sensitive', 'Sensitive']
+  ],
+  wiki: [
+    ['mechanic', 'Mechanic'],
+    ['agent', 'Agent'],
+    ['ability', 'Ability'],
+    ['ultimate', 'Ultimate'],
+    ['map', 'Map'],
+    ['weapon', 'Weapon'],
+    ['cosmetic', 'Cosmetic']
+  ]
 };
 
 let searchTimer;
@@ -25,6 +46,7 @@ elements.status.addEventListener('change', loadFlags);
 elements.refresh.addEventListener('click', () => Promise.all([loadFlags(), loadStats()]));
 elements.cancelAdd.addEventListener('click', () => elements.addDialog.close());
 elements.addForm.addEventListener('submit', addFlagToWiki);
+elements.addTarget.addEventListener('change', () => renderCategoryOptions(elements.addTarget.value));
 
 await Promise.all([loadFlags(), loadStats()]);
 
@@ -82,7 +104,7 @@ function renderFlags(entries) {
         <p class="flag-time">Last seen<br>${formatDate(entry.last_seen_at)}</p>
       </div>
       <div class="flag-actions">
-        ${entry.status !== 'resolved' ? `<button class="button button-accent" data-add-id="${entry.id}" type="button">Add to wiki</button>` : '<span class="flag-decision">Added to wiki</span>'}
+        ${entry.status !== 'resolved' ? `<button class="button button-accent" data-add-id="${entry.id}" type="button">Add to knowledge</button>` : '<span class="flag-decision">Resolved</span>'}
         ${entry.status === 'open' ? actionButton(entry.id, 'ignored', 'Ignore') : ''}
       </div>
     </article>
@@ -118,7 +140,8 @@ function openAddDialog(entry) {
   if (!entry) return;
   selectedFlag = entry;
   elements.addTerm.value = entry.word;
-  elements.addCategory.value = 'mechanic';
+  elements.addTarget.value = 'slang';
+  renderCategoryOptions('slang');
   elements.addExplanation.value = '';
   elements.addDialog.showModal();
   elements.addExplanation.focus();
@@ -129,17 +152,22 @@ async function addFlagToWiki(event) {
   if (!selectedFlag) return;
   elements.publishAdd.disabled = true;
   try {
-    await request('/api/wiki', {
+    const target = elements.addTarget.value === 'wiki' ? 'wiki' : 'slang';
+    await request(target === 'wiki' ? '/api/wiki' : '/api/slang', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      body: JSON.stringify(target === 'wiki' ? {
         term: selectedFlag.word,
         category: elements.addCategory.value,
         explanation: elements.addExplanation.value.trim()
+      } : {
+        term: selectedFlag.word,
+        category: elements.addCategory.value,
+        definition: elements.addExplanation.value.trim()
       })
     });
     elements.addDialog.close();
-    showToast(`Added "${selectedFlag.word}" to the wiki and resolved its flag.`);
+    showToast(`Added "${selectedFlag.word}" to ${target === 'wiki' ? 'the wiki' : 'the slang dictionary'} and resolved its flag.`);
     selectedFlag = null;
     await Promise.all([loadFlags(), loadStats()]);
   } catch (error) {
@@ -147,6 +175,13 @@ async function addFlagToWiki(event) {
   } finally {
     elements.publishAdd.disabled = false;
   }
+}
+
+function renderCategoryOptions(target) {
+  const options = CATEGORY_OPTIONS[target] || CATEGORY_OPTIONS.slang;
+  elements.addCategory.innerHTML = options.map(([value, label]) => (
+    `<option value="${value}">${label}</option>`
+  )).join('');
 }
 
 async function request(url, options = {}, allowEmpty = false) {

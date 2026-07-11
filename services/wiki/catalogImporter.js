@@ -10,12 +10,46 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const snapshotPath = join(__dirname, 'resources', 'valorant-catalog.json');
 
 export async function downloadValorantCatalog(options = {}) {
-  const [agentsPayload, mapsPayload, weaponsPayload, gameModesPayload, gearPayload] = await Promise.all([
+  const [
+    agentsPayload,
+    mapsPayload,
+    weaponsPayload,
+    gameModesPayload,
+    gearPayload,
+    buddiesPayload,
+    bundlesPayload,
+    playerCardsPayload,
+    playerTitlesPayload,
+    spraysPayload,
+    currenciesPayload,
+    contentTiersPayload,
+    themesPayload,
+    levelBordersPayload,
+    ceremoniesPayload,
+    contractsPayload,
+    eventsPayload,
+    seasonsPayload,
+    competitiveTiersPayload
+  ] = await Promise.all([
     fetchJson(createApiUrl('agents', { isPlayableCharacter: true }), options),
     fetchJson(createApiUrl('maps'), options),
     fetchJson(createApiUrl('weapons'), options),
     fetchJson(createApiUrl('gamemodes'), options),
-    fetchJson(createApiUrl('gear'), options)
+    fetchJson(createApiUrl('gear'), options),
+    fetchJson(createApiUrl('buddies'), options),
+    fetchJson(createApiUrl('bundles'), options),
+    fetchJson(createApiUrl('playercards'), options),
+    fetchJson(createApiUrl('playertitles'), options),
+    fetchJson(createApiUrl('sprays'), options),
+    fetchJson(createApiUrl('currencies'), options),
+    fetchJson(createApiUrl('contenttiers'), options),
+    fetchJson(createApiUrl('themes'), options),
+    fetchJson(createApiUrl('levelborders'), options),
+    fetchJson(createApiUrl('ceremonies'), options),
+    fetchJson(createApiUrl('contracts'), options),
+    fetchJson(createApiUrl('events'), options),
+    fetchJson(createApiUrl('seasons'), options),
+    fetchJson(createApiUrl('competitivetiers'), options)
   ]);
 
   const agents = arrayData(agentsPayload, 'agents');
@@ -23,16 +57,46 @@ export async function downloadValorantCatalog(options = {}) {
   const weapons = arrayData(weaponsPayload, 'weapons');
   const gameModes = arrayData(gameModesPayload, 'game modes');
   const gear = arrayData(gearPayload, 'gear');
+  const buddies = arrayData(buddiesPayload, 'buddies');
+  const bundles = arrayData(bundlesPayload, 'bundles');
+  const playerCards = arrayData(playerCardsPayload, 'player cards');
+  const playerTitles = arrayData(playerTitlesPayload, 'player titles');
+  const sprays = arrayData(spraysPayload, 'sprays');
+  const currencies = arrayData(currenciesPayload, 'currencies');
+  const contentTiers = arrayData(contentTiersPayload, 'content tiers');
+  const themes = arrayData(themesPayload, 'themes');
+  const levelBorders = arrayData(levelBordersPayload, 'level borders');
+  const ceremonies = arrayData(ceremoniesPayload, 'ceremonies');
+  const contracts = arrayData(contractsPayload, 'contracts');
+  const events = arrayData(eventsPayload, 'events');
+  const seasons = arrayData(seasonsPayload, 'seasons');
+  const competitiveTiers = arrayData(competitiveTiersPayload, 'competitive tiers');
+  const context = createCatalogContext({ contentTiers, themes });
   const entries = deduplicateEntries([
     ...agents.flatMap(mapAgentEntries),
     ...maps.map(mapMapEntry).filter(Boolean),
     ...weapons.map(mapWeaponEntry).filter(Boolean),
+    ...weapons.flatMap((weapon) => mapWeaponSkinEntries(weapon, context)),
     ...gameModes.map(mapGameModeEntry).filter(Boolean),
-    ...gear.map(mapGearEntry).filter(Boolean)
+    ...gear.map(mapGearEntry).filter(Boolean),
+    ...buddies.map((item) => mapSimpleCosmeticEntry(item, 'Gun buddy')).filter(Boolean),
+    ...bundles.map((item) => mapBundleEntry(item)).filter(Boolean),
+    ...playerCards.map((item) => mapSimpleCosmeticEntry(item, 'Player card')).filter(Boolean),
+    ...playerTitles.map((item) => mapSimpleCosmeticEntry(item, 'Player title')).filter(Boolean),
+    ...sprays.map((item) => mapSimpleCosmeticEntry(item, 'Spray')).filter(Boolean),
+    ...currencies.map((item) => mapSimpleMechanicEntry(item, 'Currency')).filter(Boolean),
+    ...contentTiers.map((item) => mapSimpleCosmeticEntry(item, 'Content tier')).filter(Boolean),
+    ...themes.map((item) => mapSimpleCosmeticEntry(item, 'Theme')).filter(Boolean),
+    ...levelBorders.map((item) => mapSimpleCosmeticEntry(item, 'Level border')).filter(Boolean),
+    ...ceremonies.map((item) => mapSimpleCosmeticEntry(item, 'Ceremony')).filter(Boolean),
+    ...contracts.map((item) => mapSimpleMechanicEntry(item, 'Contract')).filter(Boolean),
+    ...events.map((item) => mapEventEntry(item)).filter(Boolean),
+    ...seasons.map((item) => mapSeasonEntry(item)).filter(Boolean),
+    ...competitiveTiers.flatMap(mapCompetitiveTierEntries)
   ]);
 
   const counts = countCategories(entries);
-  if (counts.agent < 20 || counts.map < 10 || counts.weapon < 15 || counts.ability + counts.ultimate < 80) {
+  if (counts.agent < 20 || counts.map < 10 || counts.weapon < 15 || counts.ability + counts.ultimate < 80 || counts.cosmetic < 10) {
     throw new Error(`Catalog validation failed: ${JSON.stringify(counts)}`);
   }
 
@@ -137,6 +201,32 @@ function mapWeaponEntry(weapon) {
   };
 }
 
+function mapWeaponSkinEntries(weapon, context) {
+  const weaponName = weapon?.displayName;
+  if (!weaponName || !Array.isArray(weapon.skins)) return [];
+
+  return weapon.skins.map((skin) => mapWeaponSkinEntry(skin, weaponName, context)).filter(Boolean);
+}
+
+function mapWeaponSkinEntry(skin, weaponName, context) {
+  if (!skin?.displayName) return null;
+  const chromas = (skin.chromas || []).map((chroma) => chroma?.displayName).filter(Boolean);
+  const levels = (skin.levels || []).map((level) => level?.displayName).filter(Boolean);
+  const details = [
+    `Weapon: ${weaponName}`,
+    context.contentTiersByUuid.get(skin.contentTierUuid) ? `Edition: ${context.contentTiersByUuid.get(skin.contentTierUuid)}` : null,
+    context.themesByUuid.get(skin.themeUuid) ? `Theme: ${context.themesByUuid.get(skin.themeUuid)}` : null,
+    chromas.length ? `Variants/chromas: ${summarizeList(chromas, 12)}` : null,
+    levels.length ? `Upgrade levels: ${summarizeList(levels, 8)}` : null
+  ].filter(Boolean);
+
+  return {
+    term: `Skin: ${skin.displayName}`,
+    category: 'cosmetic',
+    explanation: `${skin.displayName} is a Valorant weapon skin. ${details.join('. ')}.`
+  };
+}
+
 function mapGameModeEntry(mode) {
   if (!mode?.displayName) return null;
   const details = [];
@@ -167,6 +257,81 @@ function mapGearEntry(gear) {
   };
 }
 
+function mapSimpleCosmeticEntry(item, type) {
+  if (!item?.displayName) return null;
+  return {
+    term: `${type}: ${item.displayName}`,
+    category: 'cosmetic',
+    explanation: joinParagraphs([
+      clean(item.description),
+      `${item.displayName} is a Valorant ${type.toLowerCase()} cosmetic.`
+    ])
+  };
+}
+
+function mapBundleEntry(bundle) {
+  if (!bundle?.displayName) return null;
+  const details = [];
+  if (bundle.displayNameSubText) details.push(clean(bundle.displayNameSubText));
+  if (bundle.extraDescription) details.push(clean(bundle.extraDescription));
+  return {
+    term: `Bundle: ${bundle.displayName}`,
+    category: 'cosmetic',
+    explanation: joinParagraphs([
+      `${bundle.displayName} is a Valorant cosmetic bundle.`,
+      details.length ? details.join(' ') : null
+    ])
+  };
+}
+
+function mapSimpleMechanicEntry(item, type) {
+  if (!item?.displayName) return null;
+  return {
+    term: `${type}: ${item.displayName}`,
+    category: 'mechanic',
+    explanation: joinParagraphs([
+      clean(item.description),
+      `${item.displayName} is a Valorant ${type.toLowerCase()}.`
+    ])
+  };
+}
+
+function mapEventEntry(event) {
+  if (!event?.displayName) return null;
+  return {
+    term: `Event: ${event.displayName}`,
+    category: 'mechanic',
+    explanation: joinParagraphs([
+      `${event.displayName} is a Valorant event.`,
+      formatDateRange(event.startTime, event.endTime)
+    ])
+  };
+}
+
+function mapSeasonEntry(season) {
+  if (!season?.displayName) return null;
+  const type = season.type ? shortEnum(season.type).toLowerCase() : 'season';
+  return {
+    term: `Season: ${season.displayName}`,
+    category: 'mechanic',
+    explanation: joinParagraphs([
+      `${season.displayName} is a Valorant ${type}.`,
+      formatDateRange(season.startTime, season.endTime)
+    ])
+  };
+}
+
+function mapCompetitiveTierEntries(group) {
+  const tiers = Array.isArray(group?.tiers) ? group.tiers : [];
+  return tiers
+    .filter((tier) => tier?.tierName && tier.tierName !== 'Unused')
+    .map((tier) => ({
+      term: `Competitive tier: ${tier.tierName}`,
+      category: 'mechanic',
+      explanation: `${tier.tierName} is a Valorant competitive rank tier. Tier number: ${tier.tier}.`
+    }));
+}
+
 function createApiUrl(endpoint, params = {}) {
   const url = new URL(`${config.valorantApiUrl.replace(/\/$/, '')}/v1/${endpoint}`);
   url.searchParams.set('language', 'en-US');
@@ -183,7 +348,14 @@ function countCategories(entries) {
   return entries.reduce((counts, entry) => {
     counts[entry.category] = (counts[entry.category] || 0) + 1;
     return counts;
-  }, { agent: 0, ability: 0, ultimate: 0, map: 0, weapon: 0, mechanic: 0 });
+  }, { agent: 0, ability: 0, ultimate: 0, map: 0, weapon: 0, cosmetic: 0, mechanic: 0 });
+}
+
+function createCatalogContext({ contentTiers = [], themes = [] } = {}) {
+  return {
+    contentTiersByUuid: new Map(contentTiers.map((item) => [item.uuid, item.displayName]).filter(([uuid, name]) => uuid && name)),
+    themesByUuid: new Map(themes.map((item) => [item.uuid, item.displayName]).filter(([uuid, name]) => uuid && name))
+  };
 }
 
 function deduplicateEntries(entries) {
@@ -206,6 +378,28 @@ function clean(value) {
 
 function shortEnum(value) {
   return String(value || '').split('::').at(-1).replace(/([a-z])([A-Z])/g, '$1 $2');
+}
+
+function summarizeList(values, limit) {
+  const unique = [...new Set(values.map(clean).filter(Boolean))];
+  if (unique.length <= limit) return unique.join(', ');
+  return `${unique.slice(0, limit).join(', ')}, and ${unique.length - limit} more`;
+}
+
+function formatDateRange(start, end) {
+  const startText = formatDate(start);
+  const endText = formatDate(end);
+  if (startText && endText) return `Runs from ${startText} to ${endText}.`;
+  if (startText) return `Starts ${startText}.`;
+  if (endText) return `Ends ${endText}.`;
+  return null;
+}
+
+function formatDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString().slice(0, 10);
 }
 
 function formatSlot(slot) {
