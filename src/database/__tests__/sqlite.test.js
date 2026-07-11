@@ -12,8 +12,10 @@ import {
   updateTicketRouting, 
   updateTicketDraft, 
   getNextPendingTicket, 
-  resetInterruptedTickets 
+  resetInterruptedTickets,
+  getQueueStats
 } from '../sqlite.js';
+
 
 describe('SQLite Database Queue Layer', () => {
   beforeEach(() => {
@@ -128,4 +130,20 @@ describe('SQLite Database Queue Layer', () => {
     expect(getTicket('T-RUN-2').error_message).toBeNull();
     expect(getTicket('T-COMP').status).toBe('completed');
   });
+
+  it('should calculate queue stats correctly across different statuses', () => {
+    insertTicket({ id: 'T-PEND-1', status: 'pending' });
+    insertTicket({ id: 'T-PEND-2', status: 'pending' });
+    insertTicket({ id: 'T-RUN-1', status: 'running' });
+    insertTicket({ id: 'T-COMP-1', status: 'completed' });
+    insertTicket({ id: 'T-FAIL-1', status: 'failed' });
+
+    const stats = getQueueStats();
+    expect(stats.pending).toBe(2);
+    expect(stats.running).toBe(1);
+    expect(stats.completed).toBe(1);
+    expect(stats.failed).toBe(1);
+    expect(stats.escalated).toBe(0);
+  });
 });
+

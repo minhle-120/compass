@@ -138,4 +138,40 @@ describe('WorkerPool Orchestrator', () => {
     // Initial check + 2 ticks = 3 calls
     expect(checkSpy).toHaveBeenCalledTimes(3);
   });
+
+  it('should track and update active worker states in activeWorkersMap', async () => {
+    insertTicket({ id: 'T-TRACK-1', status: 'pending' });
+
+    await pool.checkQueue();
+
+    // Verify entry is registered
+    expect(pool.activeWorkersMap.has('T-TRACK-1')).toBe(true);
+    const initial = pool.activeWorkersMap.get('T-TRACK-1');
+    expect(initial.step).toBe('spawned');
+    expect(initial.tokenCount).toBe(0);
+
+    const worker = _getMockInstance();
+    expect(worker).not.toBeNull();
+
+    // Simulate sending agent_activity update from worker thread
+    worker.trigger('message', {
+      type: 'agent_activity',
+      step: 'executing_tool:read_ticket',
+      toolName: 'read_ticket',
+      toolArgs: {},
+      tokenCount: 150,
+      flags: { wasTicketRead: true }
+    });
+
+    const updated = pool.activeWorkersMap.get('T-TRACK-1');
+    expect(updated.step).toBe('executing_tool:read_ticket');
+    expect(updated.toolName).toBe('read_ticket');
+    expect(updated.tokenCount).toBe(150);
+    expect(updated.flags.wasTicketRead).toBe(true);
+
+    // Simulate exit and ensure the entry is deleted
+    worker.trigger('exit', 0);
+    expect(pool.activeWorkersMap.has('T-TRACK-1')).toBe(false);
+  });
 });
+

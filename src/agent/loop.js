@@ -6,6 +6,8 @@ import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { updateTicketStatus } from '../database/sqlite.js';
 import { executeTool, getOpenAITools } from './registry.js';
+import { parentPort } from 'worker_threads';
+
 
 /**
  * Loads conversation history and performs selective tail validation
@@ -81,6 +83,16 @@ export async function runAgentLoop(sessionContext) {
   let lastKnownTokenCount = 0;
 
   while (loopActive) {
+    if (parentPort) {
+      parentPort.postMessage({
+        type: 'agent_activity',
+        ticketId,
+        step: 'awaiting_llm_completion',
+        tokenCount: lastKnownTokenCount,
+        flags: sessionContext.flags
+      });
+    }
+
     // 1. Context Token Safety Valve check using exact usage stats from last response
     if (lastKnownTokenCount > config.contextTokenBudget) {
       logger.error(`Context token budget exceeded (${lastKnownTokenCount} > ${config.contextTokenBudget}). Escalating ticket.`, `Ticket-${ticketId}`);
@@ -178,6 +190,18 @@ export async function runAgentLoop(sessionContext) {
           args = JSON.parse(argsString);
         } catch (e) {
           logger.warn(`Failed to parse arguments for tool ${name}: ${argsString}`, `Ticket-${ticketId}`);
+        }
+
+        if (parentPort) {
+          parentPort.postMessage({
+            type: 'agent_activity',
+            ticketId,
+            step: `executing_tool:${name}`,
+            toolName: name,
+            toolArgs: args,
+            tokenCount: lastKnownTokenCount,
+            flags: sessionContext.flags
+          });
         }
 
         logger.info(`Executing tool "${name}"`, `Ticket-${ticketId}`);
