@@ -1,4 +1,5 @@
 // src/tools/search_incidents.js
+import { searchIncidents } from '../../services/incident/incidentService.js';
 
 export const schema = {
   type: 'function',
@@ -19,5 +20,5 @@ export const schema = {
 };
 
 export async function handler(args, sessionContext) {
-  return 'Search incidents stub';
+  return searchIncidents(args?.query);
 }
