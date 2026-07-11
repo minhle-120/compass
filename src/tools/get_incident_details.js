@@ -1,4 +1,5 @@
 // src/tools/get_incident_details.js
+import { getIncidentDetails } from '../../services/incident/incidentService.js';
 
 export const schema = {
   type: 'function',
@@ -19,5 +20,5 @@ export const schema = {
 };
 
 export async function handler(args, sessionContext) {
-  return 'Get incident details stub';
+  return getIncidentDetails(args?.incident_id);
 }
