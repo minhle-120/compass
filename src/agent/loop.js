@@ -1,19 +1,131 @@
 // src/agent/loop.js
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, unlinkSync } from 'fs';
 import { join, dirname } from 'path';
 import axios from 'axios';
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
-import { updateTicketStatus, updateTicketResolution } from '../database/sqlite.js';
+import { assertValidTicketId } from '../utils/ticketId.js';
+import { finalizeTicket } from '../database/sqlite.js';
 import { executeTool, getOpenAITools } from './registry.js';
-import { parentPort } from 'worker_threads';
+import { parentPort, threadId } from 'worker_threads';
+
+const FLAG_BY_TOOL = {
+  read_ticket: 'wasTicketRead',
+  classify_ticket: 'wasClassified',
+  draft_response: 'wasResponseDrafted',
+  search_incidents: 'wasIncidentsChecked',
+  get_incident_details: 'wasIncidentsChecked',
+  search_knowledge_base: 'wasKnowledgeBaseChecked',
+  get_knowledge_base_article: 'wasKnowledgeBaseChecked',
+  route_ticket: 'wasRouted'
+};
+
+function writeJsonAtomic(filePath, value) {
+  const tempPath = `${filePath}.${process.pid}.${threadId}.${Date.now()}.tmp`;
+  try {
+    writeFileSync(tempPath, JSON.stringify(value, null, 2));
+    renameSync(tempPath, filePath);
+  } catch (error) {
+    if (existsSync(tempPath)) {
+      try { unlinkSync(tempPath); } catch {}
+    }
+    throw error;
+  }
+}
+
+function parseToolResult(content) {
+  try {
+    const parsed = JSON.parse(content);
+    if (typeof parsed?.ok === 'boolean') return parsed;
+  } catch {}
+  return { ok: !String(content).startsWith('Error:') && !String(content).includes('Validation failed') };
+}
+
+function repairIncompleteToolBatch(messages, ticketId) {
+  let lastAssistantIndex = -1;
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index]?.role === 'assistant' && messages[index].tool_calls?.length) {
+      lastAssistantIndex = index;
+      break;
+    }
+    if (messages[index]?.role === 'user') break;
+  }
+  if (lastAssistantIndex < 0) return false;
+
+  const requested = messages[lastAssistantIndex].tool_calls;
+  const answered = new Set(
+    messages.slice(lastAssistantIndex + 1)
+      .filter((message) => message.role === 'tool')
+      .map((message) => message.tool_call_id)
+  );
+  const missing = requested.filter((call) => !answered.has(call.id));
+  for (const call of missing) {
+    messages.push({
+      role: 'tool',
+      tool_call_id: call.id,
+      name: call.function?.name,
+      content: JSON.stringify({
+        ok: false,
+        terminal: false,
+        error: {
+          code: 'WORKER_INTERRUPTED',
+          message: 'The worker stopped before this tool call completed. Retry if still required.',
+          retryable: true
+        }
+      })
+    });
+  }
+  if (missing.length) {
+    logger.warn(`Repaired ${missing.length} interrupted tool result(s) for ticket ${ticketId}.`, `Ticket-${ticketId}`);
+  }
+  return missing.length > 0;
+}
+
+function reconstructWorkflowFlags(messages, sessionContext) {
+  const wakeIndex = messages.reduce((lastIndex, message, index) => (
+    message.role === 'user' && message.content?.includes('player has sent a new update') ? index : lastIndex
+  ), -1);
+
+  for (const message of messages.slice(wakeIndex + 1)) {
+    if (message.role !== 'tool' || !parseToolResult(message.content).ok) continue;
+    const flag = FLAG_BY_TOOL[message.name];
+    if (flag) sessionContext.flags[flag] = true;
+  }
+}
+
+function normalizeToolResult(result, toolName) {
+  if (result && typeof result === 'object' && typeof result.ok === 'boolean') return result;
+  return { ok: true, terminal: toolName === 'idle', output: result };
+}
+
+async function requestCompletion(url, body, options, providerName) {
+  let lastError;
+  for (let attempt = 0; attempt <= config.llmMaxRetries; attempt += 1) {
+    try {
+      return await axios.post(url, body, options);
+    } catch (error) {
+      lastError = error;
+      const status = error.response?.status;
+      const retryable = !status || status === 408 || status === 429 || status >= 500;
+      if (!retryable || attempt === config.llmMaxRetries) break;
+      const retryAfterSeconds = Number.parseFloat(error.response?.headers?.['retry-after']);
+      const delayMs = Number.isFinite(retryAfterSeconds)
+        ? retryAfterSeconds * 1000
+        : config.llmRetryBaseDelayMs * (2 ** attempt) + Math.floor(Math.random() * 100);
+      logger.warn(`${providerName} request failed; retrying in ${delayMs}ms (attempt ${attempt + 2}).`);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  throw lastError;
+}
 
 
 /**
  * Loads conversation history and performs selective tail validation
  * to prune dangling tool calls from interrupted assistant turns.
  */
-function loadOrCreateHistory(ticketId) {
+function loadOrCreateHistory(ticketId, workflowRevision = 0) {
+  assertValidTicketId(ticketId);
   const historyPath = join(config.historyDir, `${ticketId}.json`);
   const historyDir = dirname(historyPath);
   
@@ -27,25 +139,26 @@ function loadOrCreateHistory(ticketId) {
       { role: 'system', content: config.systemPrompt },
       { role: 'user', content: `A new ticket is assigned to you. ticket_id: "${ticketId}". Call read_ticket to read the details.` }
     ];
-    writeFileSync(historyPath, JSON.stringify(initialMessages, null, 2));
+    writeJsonAtomic(historyPath, initialMessages);
     return initialMessages;
   }
 
   try {
     const raw = readFileSync(historyPath, 'utf8');
     const messages = JSON.parse(raw);
+    const repaired = repairIncompleteToolBatch(messages, ticketId);
+    const revisionMarker = `workflow_revision:${workflowRevision}`;
+    const revisionAdded = workflowRevision > 0
+      && !messages.some((message) => message.content?.includes(revisionMarker));
+    if (revisionAdded) {
+      messages.push({
+        role: 'user',
+        content: `The player has sent a new update (${revisionMarker}). Call read_ticket to read the new message and process this revision.`
+      });
+    }
     
-    // Selective Tail Validation
-    if (messages.length > 0) {
-      const lastMsg = messages[messages.length - 1];
-      
-      // If the last message is from assistant requesting tool calls, but there is no subsequent
-      // tool response message, the worker must have crashed mid-turn.
-      if (lastMsg.role === 'assistant' && lastMsg.tool_calls && lastMsg.tool_calls.length > 0) {
-        logger.warn(`Detected incomplete assistant turn in history for ticket ${ticketId}. Truncating tail message.`, `Ticket-${ticketId}`);
-        messages.pop(); // Remove the dangling assistant turn
-        writeFileSync(historyPath, JSON.stringify(messages, null, 2));
-      }
+    if (repaired || revisionAdded) {
+      writeJsonAtomic(historyPath, messages);
     }
     
     return messages;
@@ -55,7 +168,7 @@ function loadOrCreateHistory(ticketId) {
       { role: 'system', content: config.systemPrompt },
       { role: 'user', content: `A new ticket is assigned to you. ticket_id: "${ticketId}". Call read_ticket to read the details.` }
     ];
-    writeFileSync(historyPath, JSON.stringify(initialMessages, null, 2));
+    writeJsonAtomic(historyPath, initialMessages);
     return initialMessages;
   }
 }
@@ -65,7 +178,7 @@ function loadOrCreateHistory(ticketId) {
  */
 function saveHistory(ticketId, messages) {
   const historyPath = join(config.historyDir, `${ticketId}.json`);
-  writeFileSync(historyPath, JSON.stringify(messages, null, 2));
+  writeJsonAtomic(historyPath, messages);
 }
 
 /**
@@ -75,7 +188,8 @@ export async function runAgentLoop(sessionContext) {
   const { ticketId } = sessionContext;
   logger.info(`Entering agent loop using ${config.llmProvider.toUpperCase()} provider`, `Ticket-${ticketId}`);
   
-  const messages = loadOrCreateHistory(ticketId);
+  const messages = loadOrCreateHistory(ticketId, sessionContext.workflowRevision || 0);
+  reconstructWorkflowFlags(messages, sessionContext);
   const openAiTools = getOpenAITools();
 
   let loopActive = true;
@@ -96,8 +210,6 @@ export async function runAgentLoop(sessionContext) {
     // 1. Context Token Safety Valve check using exact usage stats from last response
     if (lastKnownTokenCount > config.contextTokenBudget) {
       logger.error(`Context token budget exceeded (${lastKnownTokenCount} > ${config.contextTokenBudget}). Escalating ticket.`, `Ticket-${ticketId}`);
-      updateTicketStatus(ticketId, 'escalated', 'Context token limit reached');
-      
       messages.push({
         role: 'system',
         content: `SYSTEM: Conversation halted. Context budget of ${config.contextTokenBudget} tokens exceeded.`
@@ -139,7 +251,7 @@ export async function runAgentLoop(sessionContext) {
 
     let response;
     try {
-      response = await axios.post(
+      response = await requestCompletion(
         url,
         {
           model: modelName,
@@ -150,7 +262,8 @@ export async function runAgentLoop(sessionContext) {
         {
           headers: headers,
           timeout: requestTimeout
-        }
+        },
+        config.llmProvider.toUpperCase()
       );
     } catch (apiErr) {
       const errorMsg = apiErr.response?.data?.error?.message || apiErr.message || String(apiErr);
@@ -183,13 +296,51 @@ export async function runAgentLoop(sessionContext) {
     if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
       logger.info(`Received ${assistantMessage.tool_calls.length} tool calls from assistant`, `Ticket-${ticketId}`);
       
-      for (const toolCall of assistantMessage.tool_calls) {
-        const { name, arguments: argsString } = toolCall.function;
-        let args = {};
+      for (let toolIndex = 0; toolIndex < assistantMessage.tool_calls.length; toolIndex += 1) {
+        let toolCall = assistantMessage.tool_calls[toolIndex];
+        if (!toolCall || typeof toolCall !== 'object') {
+          toolCall = {};
+          assistantMessage.tool_calls[toolIndex] = toolCall;
+        }
+        const callId = toolCall?.id || `malformed-${Date.now()}`;
+        const name = toolCall?.function?.name;
+        const argsString = toolCall?.function?.arguments;
+        if (!toolCall?.id || !name || typeof argsString !== 'string') {
+          toolCall.id = callId;
+          toolCall.type = 'function';
+          toolCall.function = {
+            name: name || 'unknown_tool',
+            arguments: typeof argsString === 'string' ? argsString : '{}'
+          };
+          const malformedResult = {
+            ok: false,
+            terminal: false,
+            error: { code: 'MALFORMED_TOOL_CALL', message: 'The model returned an incomplete tool call.', retryable: false }
+          };
+          messages.push({
+            role: 'tool',
+            tool_call_id: callId,
+            name: name || 'unknown_tool',
+            content: JSON.stringify(malformedResult)
+          });
+          saveHistory(ticketId, messages);
+          continue;
+        }
+        let args;
         try {
           args = JSON.parse(argsString);
         } catch (e) {
           logger.warn(`Failed to parse arguments for tool ${name}: ${argsString}`, `Ticket-${ticketId}`);
+          const invalidResult = {
+            ok: false,
+            terminal: false,
+            error: { code: 'INVALID_ARGUMENTS_JSON', message: 'Tool arguments were not valid JSON.', retryable: false }
+          };
+          messages.push({
+            role: 'tool', tool_call_id: toolCall.id, name, content: JSON.stringify(invalidResult)
+          });
+          saveHistory(ticketId, messages);
+          continue;
         }
 
         if (parentPort) {
@@ -206,12 +357,16 @@ export async function runAgentLoop(sessionContext) {
 
         logger.info(`Executing tool "${name}"`, `Ticket-${ticketId}`);
         
-        let toolOutput;
+        let toolResult;
         try {
-          toolOutput = await executeTool(name, args, sessionContext);
+          toolResult = normalizeToolResult(await executeTool(name, args, sessionContext), name);
         } catch (toolExecErr) {
           logger.error(`Error executing tool "${name}"`, `Ticket-${ticketId}`, toolExecErr);
-          toolOutput = `Error: Tool execution failed: ${toolExecErr.message}`;
+          toolResult = {
+            ok: false,
+            terminal: false,
+            error: { code: 'TOOL_BROKER_FAILED', message: toolExecErr.message, retryable: false }
+          };
         }
 
         // Add tool response message
@@ -219,20 +374,14 @@ export async function runAgentLoop(sessionContext) {
           role: 'tool',
           tool_call_id: toolCall.id,
           name: name,
-          content: typeof toolOutput === 'string' ? toolOutput : JSON.stringify(toolOutput)
+          content: JSON.stringify(toolResult)
         });
         saveHistory(ticketId, messages);
 
         // Check if the loop has terminated successfully via the idle tool check
-        if (name === 'idle' && !toolOutput.includes('Validation failed')) {
+        if (name === 'idle' && toolResult.ok && toolResult.terminal !== false) {
           logger.info(`Idle tool execution validated. Exiting agent loop.`, `Ticket-${ticketId}`);
           loopActive = false;
-          
-          try {
-            updateTicketResolution(ticketId, sessionContext.resolutionType, sessionContext.resolutionReason);
-          } catch (resErr) {
-            logger.error(`Failed to save ticket resolution: ${resErr.message}`, `Ticket-${ticketId}`);
-          }
           
           // Determine final status based on resolution outcome
           if (sessionContext.resolutionType === 'escalated') {
@@ -255,7 +404,11 @@ export async function runAgentLoop(sessionContext) {
     }
   }
 
-  // Update ticket final status in SQLite
-  updateTicketStatus(ticketId, exitStatus);
-  return { status: exitStatus };
+  const finalized = finalizeTicket(
+    ticketId,
+    exitStatus,
+    sessionContext.resolutionType || (exitStatus === 'escalated' ? 'escalated' : null),
+    sessionContext.resolutionReason || (exitStatus === 'escalated' ? 'Context token limit reached' : null)
+  );
+  return { status: finalized.status, finalized: finalized.finalized };
 }

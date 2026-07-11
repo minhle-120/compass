@@ -23,13 +23,13 @@ export async function handler(args, sessionContext) {
   const { ticketId } = sessionContext;
   const responseText = String(args?.response || '').trim();
   if (!responseText) {
-    return 'A drafted response is required.';
+    throw new TypeError('A drafted response is required.');
   }
 
   try {
     updateTicketDraft(ticketId, responseText);
     return `Draft response saved successfully for ticket "${ticketId}".`;
   } catch (error) {
-    return `Failed to save draft response: ${error.message}`;
+    throw new Error(`Failed to save draft response: ${error.message}`, { cause: error });
   }
 }

@@ -46,7 +46,9 @@ export function initDb() {
       routing_reason TEXT,
       draft_response TEXT,
       error_message TEXT,
-      resolution_type TEXT
+      resolution_type TEXT,
+      resolution_reason TEXT,
+      workflow_revision INTEGER NOT NULL DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS kb_articles (
@@ -74,6 +76,14 @@ export function initDb() {
     );
   `);
 
+  const ticketColumns = db.prepare('PRAGMA table_info(tickets)').all();
+  if (!ticketColumns.some((column) => column.name === 'resolution_reason')) {
+    db.exec('ALTER TABLE tickets ADD COLUMN resolution_reason TEXT');
+  }
+  if (!ticketColumns.some((column) => column.name === 'workflow_revision')) {
+    db.exec('ALTER TABLE tickets ADD COLUMN workflow_revision INTEGER NOT NULL DEFAULT 0');
+  }
+
   logger.info(`SQLite database initialized at ${dbPath}`);
   return db;
 }
@@ -99,15 +109,19 @@ export function resetInterruptedTickets() {
   return info.changes;
 }
 
-export function getNextPendingTicket() {
+export function getNextPendingTicket(excludedIds = []) {
   const database = getDb();
+  const exclusions = excludedIds.length
+    ? `AND id NOT IN (${excludedIds.map(() => '?').join(', ')})`
+    : '';
   const stmt = database.prepare(`
     SELECT * FROM tickets
     WHERE status = 'pending'
+    ${exclusions}
     ORDER BY created_at ASC
     LIMIT 1
   `);
-  return stmt.get();
+  return stmt.get(...excludedIds);
 }
 
 export function getTicket(id) {
@@ -167,15 +181,50 @@ export function updateTicketDraft(id, draftResponse) {
   stmt.run(draftResponse, now, id);
 }
 
-export function updateTicketResolution(id, resolutionType, resolutionReason) {
+export function finalizeTicket(id, status, resolutionType, resolutionReason) {
   const database = getDb();
-  const stmt = database.prepare(`
-    UPDATE tickets
-    SET resolution_type = ?, rationale = ?, updated_at = ?
-    WHERE id = ?
-  `);
-  const now = new Date().toISOString();
-  stmt.run(resolutionType, resolutionReason, now, id);
+  const finalize = database.transaction(() => {
+    const now = new Date().toISOString();
+    const info = database.prepare(`
+      UPDATE tickets
+      SET status = ?, resolution_type = ?, resolution_reason = ?,
+          error_message = NULL, updated_at = ?
+      WHERE id = ? AND status = 'running'
+    `).run(status, resolutionType, resolutionReason, now, id);
+
+    if (info.changes === 1) return { status, finalized: true };
+
+    const current = database.prepare('SELECT status FROM tickets WHERE id = ?').get(id);
+    if (!current) throw new Error(`Ticket "${id}" not found during finalization.`);
+    return { status: current.status, finalized: false };
+  });
+
+  return finalize();
+}
+
+export function appendTicketMessage(id, sender, message) {
+  const database = getDb();
+  const append = database.transaction(() => {
+    const ticket = database.prepare('SELECT conversation FROM tickets WHERE id = ?').get(id);
+    if (!ticket) return null;
+
+    let conversation = [];
+    if (ticket.conversation) {
+      try { conversation = JSON.parse(ticket.conversation); } catch { conversation = []; }
+    }
+    conversation.push({ sender, timestamp: new Date().toISOString(), message });
+
+    const now = new Date().toISOString();
+    database.prepare(`
+      UPDATE tickets
+      SET conversation = ?, status = 'pending', workflow_revision = workflow_revision + 1,
+          updated_at = ?
+      WHERE id = ?
+    `).run(JSON.stringify(conversation), now, id);
+
+    return database.prepare('SELECT workflow_revision FROM tickets WHERE id = ?').get(id);
+  });
+  return append();
 }
 
 export function insertTicket(ticket) {
@@ -230,4 +279,3 @@ export function getQueueStats() {
   }
   return stats;
 }
-

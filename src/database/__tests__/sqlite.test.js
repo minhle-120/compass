@@ -13,7 +13,9 @@ import {
   updateTicketDraft, 
   getNextPendingTicket, 
   resetInterruptedTickets,
-  getQueueStats
+  getQueueStats,
+  finalizeTicket,
+  appendTicketMessage
 } from '../sqlite.js';
 
 
@@ -113,6 +115,13 @@ describe('SQLite Database Queue Layer', () => {
     expect(nextPending.id).toBe('T-EARLY'); // Should get oldest pending ticket
   });
 
+  it('should skip active ticket IDs while selecting pending work', () => {
+    insertTicket({ id: 'T-ACTIVE', created_at: '2026-07-11T10:00:00Z', status: 'pending' });
+    insertTicket({ id: 'T-NEXT', created_at: '2026-07-11T11:00:00Z', status: 'pending' });
+
+    expect(getNextPendingTicket(['T-ACTIVE']).id).toBe('T-NEXT');
+  });
+
   it('should reset running tickets back to pending on crash recovery', () => {
     const ticket1 = { id: 'T-RUN-1', status: 'running' };
     const ticket2 = { id: 'T-RUN-2', status: 'running', error_message: 'Some error' };
@@ -145,5 +154,52 @@ describe('SQLite Database Queue Layer', () => {
     expect(stats.failed).toBe(1);
     expect(stats.escalated).toBe(0);
   });
-});
 
+  it('should preserve a pending player reply instead of overwriting it during finalization', () => {
+    insertTicket({ id: 'T-REVISION', status: 'running', conversation: [] });
+    appendTicketMessage('T-REVISION', 'player', 'One more detail');
+
+    const result = finalizeTicket('T-REVISION', 'completed', 'resolved', 'Done');
+    const ticket = getTicket('T-REVISION');
+
+    expect(result).toEqual({ status: 'pending', finalized: false });
+    expect(ticket.workflow_revision).toBe(1);
+    expect(ticket.conversation).toHaveLength(1);
+    expect(ticket.resolution_type).toBeNull();
+  });
+
+  it('should finalize status and resolution atomically for a running ticket', () => {
+    insertTicket({ id: 'T-FINALIZE', status: 'running' });
+
+    expect(finalizeTicket('T-FINALIZE', 'completed', 'resolved', 'Answered')).toEqual({
+      status: 'completed',
+      finalized: true
+    });
+    expect(getTicket('T-FINALIZE')).toMatchObject({
+      status: 'completed',
+      resolution_type: 'resolved',
+      resolution_reason: 'Answered'
+    });
+  });
+
+  it('should return null when appending a message to a missing ticket', () => {
+    expect(appendTicketMessage('T-MISSING', 'player', 'Hello')).toBeNull();
+  });
+
+  it('should recover from malformed stored conversation JSON when appending', () => {
+    insertTicket({ id: 'T-BAD-CONVERSATION', status: 'completed' });
+    initDb().prepare('UPDATE tickets SET conversation = ? WHERE id = ?')
+      .run('{bad-json', 'T-BAD-CONVERSATION');
+
+    appendTicketMessage('T-BAD-CONVERSATION', 'player', 'Fresh message');
+
+    expect(getTicket('T-BAD-CONVERSATION').conversation).toEqual([
+      expect.objectContaining({ sender: 'player', message: 'Fresh message' })
+    ]);
+  });
+
+  it('should throw when finalizing a missing ticket', () => {
+    expect(() => finalizeTicket('T-MISSING', 'completed', 'resolved', 'Done'))
+      .toThrow('not found during finalization');
+  });
+});

@@ -6,13 +6,13 @@ import { readFileSync, existsSync } from 'fs';
 
 import { config } from './config.js';
 import { logger } from './utils/logger.js';
-import { initDb, resetInterruptedTickets, getTicket, insertTicket, getDb, getQueueStats } from './database/sqlite.js';
+import { isValidTicketId } from './utils/ticketId.js';
+import { initDb, resetInterruptedTickets, getTicket, insertTicket, getDb, getQueueStats, appendTicketMessage } from './database/sqlite.js';
 import { pool } from './worker/pool.js';
 
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-
 // Initialize DB schema and reset interrupted tickets
 initDb();
 resetInterruptedTickets();
@@ -79,6 +79,7 @@ app.get('/api/system/status', (req, res) => {
 // API Endpoint to fetch status of a single ticket
 app.get('/api/tickets/:id', (req, res) => {
   try {
+    if (!isValidTicketId(req.params.id)) return res.status(400).json({ error: 'Invalid ticket ID' });
     const ticket = getTicket(req.params.id);
     if (!ticket) {
       return res.status(404).json({ error: 'Ticket not found' });
@@ -93,6 +94,7 @@ app.get('/api/tickets/:id', (req, res) => {
 // API Endpoint to fetch raw conversation history trace from disk
 app.get('/api/tickets/:id/history', (req, res) => {
   try {
+    if (!isValidTicketId(req.params.id)) return res.status(400).json({ error: 'Invalid ticket ID' });
     const historyPath = join(config.historyDir, `${req.params.id}.json`);
     if (!existsSync(historyPath)) {
       return res.status(404).json({ error: 'History not found' });
@@ -120,44 +122,14 @@ app.post('/api/tickets/:id/messages', (req, res) => {
     }
 
 
+    if (!isValidTicketId(id)) return res.status(400).json({ error: 'Invalid ticket ID' });
+
     const ticket = getTicket(id);
     if (!ticket) {
       return res.status(404).json({ error: 'Ticket not found' });
     }
 
-    // Append new message to conversation list
-    const conversation = ticket.conversation || [];
-    conversation.push({
-      sender: sender || 'player',
-      timestamp: new Date().toISOString(),
-      message
-    });
-
-    // Update SQLite record and reset status to pending so pool runs it
-    const database = getDb();
-    const now = new Date().toISOString();
-    const updateStmt = database.prepare(`
-      UPDATE tickets
-      SET conversation = ?, status = 'pending', updated_at = ?
-      WHERE id = ?
-    `);
-    updateStmt.run(JSON.stringify(conversation), now, id);
-
-    // Append wake-up prompt to history file on disk so the agent loop wakes up
-    const historyPath = join(config.historyDir, `${id}.json`);
-    if (existsSync(historyPath)) {
-      try {
-        const raw = readFileSync(historyPath, 'utf8');
-        const messages = JSON.parse(raw);
-        messages.push({
-          role: 'user',
-          content: 'The player has sent a new update. Call read_ticket to read the new message and update the ticket state.'
-        });
-        writeFileSync(historyPath, JSON.stringify(messages, null, 2));
-      } catch (err) {
-        logger.error(`Failed to append wake-up prompt to history file for ticket ${id}`, 'ExpressAPI', err);
-      }
-    }
+    appendTicketMessage(id, sender || 'player', message.trim());
 
     logger.info(`Received player reply for ticket ${id}. Resetting status to pending.`, 'ExpressAPI');
 
@@ -181,6 +153,9 @@ app.post('/api/tickets', (req, res) => {
     // Auto-generate ticket ID if not provided
     if (!ticketData.id || typeof ticketData.id !== 'string' || !ticketData.id.trim()) {
       ticketData.id = `T-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    }
+    if (!isValidTicketId(ticketData.id)) {
+      return res.status(400).json({ error: 'Ticket ID may contain only letters, numbers, underscores, and hyphens' });
     }
     if (!ticketData.subject || typeof ticketData.subject !== 'string' || !ticketData.subject.trim()) {
       return res.status(400).json({ error: 'A valid string Ticket Subject is required' });
