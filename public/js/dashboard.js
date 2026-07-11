@@ -1,3 +1,5 @@
+import { formatHumanHistory, formatRawHistory } from './historyFormatter.js';
+
 document.addEventListener('DOMContentLoaded', () => {
   const POLL_INTERVAL = 3000;
 
@@ -17,6 +19,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const detailHistory = document.getElementById('detail-history');
   const detailActions = document.getElementById('detail-actions');
   const detailClose = document.getElementById('detail-close');
+  const historyHuman = document.getElementById('history-human');
+  const historyRaw = document.getElementById('history-raw');
+  let currentHistory = [];
+  let historyMode = 'human';
+
+  historyHuman.addEventListener('click', () => setHistoryMode('human'));
+  historyRaw.addEventListener('click', () => setHistoryMode('raw'));
 
   // Close detail panel
   detailClose.addEventListener('click', () => { detailOverlay.style.display = 'none'; });
@@ -148,6 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
     detailTitle.textContent = ticketId;
     detailFields.innerHTML = '<dd>Loading…</dd>';
     detailHistory.innerHTML = '<div class="text-muted">Loading…</div>';
+    currentHistory = [];
     detailActions.style.display = 'none';
     detailActions.innerHTML = '';
 
@@ -201,46 +211,37 @@ document.addEventListener('DOMContentLoaded', () => {
         detailHistory.innerHTML = '<div class="text-muted">No history available.</div>';
         return;
       }
-      const history = await res.json();
-      detailHistory.innerHTML = renderHistory(history);
+      currentHistory = await res.json();
+      renderCurrentHistory();
     } catch (err) {
       detailHistory.innerHTML = '<div class="text-muted">Failed to load history.</div>';
     }
   }
 
-  function renderHistory(messages) {
+  function setHistoryMode(mode) {
+    historyMode = mode;
+    historyHuman.classList.toggle('btn-primary', mode === 'human');
+    historyRaw.classList.toggle('btn-primary', mode === 'raw');
+    renderCurrentHistory();
+  }
+
+  function renderCurrentHistory() {
+    if (historyMode === 'raw') {
+      detailHistory.innerHTML = `<pre class="timeline-content" style="max-height:none; overflow:auto; margin:0;">${esc(formatRawHistory(currentHistory))}</pre>`;
+      return;
+    }
+    detailHistory.innerHTML = renderHumanHistory(currentHistory);
+  }
+
+  function renderHumanHistory(messages) {
     if (!messages || messages.length === 0) {
       return '<div class="text-muted">No conversation history.</div>';
     }
-    return '<ul class="timeline">' + messages.map(msg => {
-      const role = msg.role || 'unknown';
-      let content = '';
-
-      if (role === 'assistant') {
-        if (msg.tool_calls && msg.tool_calls.length > 0) {
-          content = msg.tool_calls.map(tc => {
-            const fn = tc.function || {};
-            let args = fn.arguments || '{}';
-            try { args = JSON.stringify(JSON.parse(args), null, 2); } catch (e) {}
-            return `→ ${fn.name}(${args})`;
-          }).join('\n');
-        }
-        if (msg.reasoning_content) {
-          content = '💭 ' + msg.reasoning_content + (content ? '\n' + content : '');
-        }
-        if (msg.content) {
-          content = msg.content + (content ? '\n' + content : '');
-        }
-      } else if (role === 'tool') {
-        content = `[${msg.name || 'tool'}] ${msg.content || ''}`;
-      } else {
-        content = msg.content || '';
-      }
-
+    return '<ul class="timeline">' + formatHumanHistory(messages).map(entry => {
       return `
         <li class="timeline-item">
-          <div class="timeline-role ${role}">${role}</div>
-          <div class="timeline-content">${esc(truncate(content, 800))}</div>
+          <div class="timeline-role ${entry.role}">${esc(entry.label)}</div>
+          <div class="timeline-content">${esc(entry.content)}</div>
         </li>
       `;
     }).join('') + '</ul>';

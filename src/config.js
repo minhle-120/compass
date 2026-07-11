@@ -9,7 +9,7 @@ export const config = {
   // Server & Queue Database Configuration
   port: parseInt(process.env.PORT || '3000', 10),
   get dbPath() {
-    return process.env.DB_PATH || './data/database.sqlite';
+    return process.env.DB_PATH || './src/data/database.sqlite';
   },
 
   concurrencyCap: 5,

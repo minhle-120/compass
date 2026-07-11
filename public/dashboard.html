@@ -84,7 +84,13 @@
           <dl id="detail-fields" class="detail-grid"></dl>
           <div id="detail-actions" style="display:none; margin-top:16px;"></div>
         </div>
-        <div class="box-header" style="border-radius:0;">Agent Conversation History</div>
+        <div class="box-header" style="border-radius:0;">
+          <span>Agent Conversation History</span>
+          <div style="display:flex; gap:4px;">
+            <button id="history-human" class="btn btn-sm btn-primary" type="button">Human readable</button>
+            <button id="history-raw" class="btn btn-sm" type="button">Raw</button>
+          </div>
+        </div>
         <div class="box-body" id="detail-history">
           <div class="text-muted">Loading…</div>
         </div>
@@ -93,6 +99,6 @@
 
   </main>
 
-  <script src="/js/dashboard.js"></script>
+  <script type="module" src="/js/dashboard.js"></script>
 </body>
 </html>
