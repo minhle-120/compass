@@ -69,6 +69,8 @@ export async function executeTool(name, args, sessionContext) {
     sessionContext.flags.wasResponseDrafted = true;
   } else if (name === 'search_incidents' || name === 'get_incident_details') {
     sessionContext.flags.wasIncidentsChecked = true;
+  } else if (name === 'search_knowledge_base' || name === 'get_knowledge_base_article') {
+    sessionContext.flags.wasKnowledgeBaseChecked = true;
   } else if (name === 'route_ticket') {
     sessionContext.flags.wasRouted = true;
     sessionContext.routingDestination = args.destination;
@@ -86,6 +88,7 @@ export async function executeTool(name, args, sessionContext) {
 
     if (resolutionType === 'resolved') {
       if (!sessionContext.flags.wasIncidentsChecked) missing.push('search_incidents or get_incident_details');
+      if (!sessionContext.flags.wasKnowledgeBaseChecked) missing.push('search_knowledge_base or get_knowledge_base_article');
       if (!sessionContext.flags.wasClassified) missing.push('classify_ticket');
       if (!sessionContext.flags.wasResponseDrafted) missing.push('draft_response');
       if (!sessionContext.flags.wasRouted) missing.push('route_ticket');

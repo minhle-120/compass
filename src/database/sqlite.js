@@ -47,8 +47,31 @@ export function initDb() {
       draft_response TEXT,
       error_message TEXT
     );
-  `);
 
+    CREATE TABLE IF NOT EXISTS kb_articles (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'published',
+      platforms TEXT,
+      game_versions TEXT,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      summary TEXT NOT NULL,
+      excerpt TEXT NOT NULL DEFAULT '',
+      content TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_kb_articles_updated_at ON kb_articles(updated_at);
+
+    CREATE TABLE IF NOT EXISTS slang (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      slang TEXT NOT NULL,
+      description TEXT NOT NULL,
+      example TEXT,
+      context TEXT,
+      source TEXT NOT NULL, /* 'genz' or 'game' */
+      UNIQUE(slang, source)
+    );
+  `);
 
   logger.info(`SQLite database initialized at ${dbPath}`);
   return db;
