@@ -4,12 +4,13 @@ import { join } from 'path';
 import axios from 'axios';
 import { runAgentLoop } from '../loop.js';
 import { config } from '../../config.js';
-import { updateTicketStatus } from '../../database/sqlite.js';
+import { updateTicketStatus, updateTicketResolution } from '../../database/sqlite.js';
 import { executeTool, getOpenAITools } from '../registry.js';
 
 // Mock sqlite database updates
 vi.mock('../../database/sqlite.js', () => ({
-  updateTicketStatus: vi.fn()
+  updateTicketStatus: vi.fn(),
+  updateTicketResolution: vi.fn()
 }));
 
 // Mock the tool registry to decouple loop tests from actual tool implementations

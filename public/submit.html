@@ -12,14 +12,16 @@
       <a href="/" class="header-logo">⊙ Compass</a>
       <nav class="header-nav">
         <a href="/submit.html" class="active">Submit Ticket</a>
+        <a href="/tickets.html">Browse Tickets</a>
         <a href="/dashboard.html">Dashboard</a>
       </nav>
     </div>
   </header>
 
-  <main class="container" style="max-width: 720px;">
+  <main class="container" style="max-width: 640px;">
     <div class="page-heading">
       <h1>New Support Ticket</h1>
+      <p class="subtitle" style="color: var(--color-fg-muted); margin-top: 4px;">Submit a customer issue to be processed by the support system.</p>
     </div>
 
     <div id="flash" class="flash"></div>
@@ -29,98 +31,14 @@
         <div class="box-header">Ticket Details</div>
         <div class="box-body">
           <div class="form-group">
-            <label for="ticket-id">Ticket ID</label>
-            <span class="hint">A unique identifier for this ticket (e.g. T-1001)</span>
-            <input type="text" id="ticket-id" class="form-control" placeholder="T-1001" required>
-          </div>
-
-          <div class="form-group">
             <label for="ticket-subject">Subject</label>
-            <input type="text" id="ticket-subject" class="form-control" placeholder="Brief summary of the issue" required>
+            <input type="text" id="ticket-subject" class="form-control" placeholder="Brief summary of the issue (e.g. Account login issue)" required>
           </div>
 
           <div class="form-group">
             <label for="ticket-description">Description</label>
-            <span class="hint">Describe the player's issue in detail.</span>
-            <textarea id="ticket-description" class="form-control" rows="5" placeholder="What happened? When did it start?" required></textarea>
-          </div>
-        </div>
-      </div>
-
-      <div class="box mt-4">
-        <div class="box-header">Player & Device Context</div>
-        <div class="box-body">
-          <div class="form-row">
-            <div class="form-group">
-              <label for="ticket-requester">Requester ID</label>
-              <input type="text" id="ticket-requester" class="form-control" placeholder="player_123">
-            </div>
-            <div class="form-group">
-              <label for="ticket-account">Account ID</label>
-              <input type="text" id="ticket-account" class="form-control" placeholder="acc_456">
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label for="ticket-platform">Platform</label>
-              <select id="ticket-platform" class="form-control">
-                <option value="">Select platform</option>
-                <option value="Android">Android</option>
-                <option value="iOS">iOS</option>
-                <option value="PC">PC</option>
-                <option value="Console">Console</option>
-                <option value="Web">Web</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="ticket-region">Region</label>
-              <select id="ticket-region" class="form-control">
-                <option value="">Select region</option>
-                <option value="NA">NA</option>
-                <option value="EU">EU</option>
-                <option value="SEA">SEA</option>
-                <option value="JP">JP</option>
-                <option value="KR">KR</option>
-                <option value="Global">Global</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label for="ticket-device">Device</label>
-              <input type="text" id="ticket-device" class="form-control" placeholder="Samsung Galaxy S24">
-            </div>
-            <div class="form-group">
-              <label for="ticket-version">Game Version</label>
-              <input type="text" id="ticket-version" class="form-control" placeholder="4.18.2">
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label for="ticket-locale">Locale</label>
-            <input type="text" id="ticket-locale" class="form-control" placeholder="en-US" style="max-width: 200px;">
-          </div>
-        </div>
-      </div>
-
-      <div class="box mt-4">
-        <div class="box-header">Transaction Info (Optional)</div>
-        <div class="box-body">
-          <div class="form-row">
-            <div class="form-group">
-              <label for="ticket-txn">Transaction ID</label>
-              <input type="text" id="ticket-txn" class="form-control" placeholder="txn_abc123">
-            </div>
-            <div class="form-group">
-              <label for="ticket-product">Product</label>
-              <input type="text" id="ticket-product" class="form-control" placeholder="Gem Pack 500">
-            </div>
-          </div>
-          <div class="form-group">
-            <label for="ticket-amount">Amount</label>
-            <input type="text" id="ticket-amount" class="form-control" placeholder="9.99" style="max-width: 200px;">
+            <span class="hint">Please describe the problem in detail so the AI support agent can resolve it.</span>
+            <textarea id="ticket-description" class="form-control" rows="6" placeholder="Provide full context, symptoms, or error messages..." required></textarea>
           </div>
         </div>
       </div>
