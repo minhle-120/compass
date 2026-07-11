@@ -26,13 +26,13 @@ graph TD
 ### 1.1 Management Level (Parent Thread)
 * **Express Web Server (`src/index.js`)**: Hosts endpoints to serve the web dashboard, submit support tickets, and fetch conversation audit logs.
 * **SQLite Database (`src/database/sqlite.js`)**: Low-level infrastructural driver for the ticket queue database. Manages tables, transactions, state mutations, and startup queue cleanups.
-* **Worker Pool (`src/worker/pool.js`)**: Polling orchestrator that manages concurrency (capped at 5 tickets) and spawns isolated `worker_threads` for pending tickets.
+* **Worker Pool (`src/worker/pool.js`)**: Polling orchestrator that manages concurrency (capped at 5 tickets), spawns isolated `worker_threads` for pending tickets, and runs an execution watchdog timer to terminate hung workers after `workerTimeoutMs`.
 * **Crash Recovery**: During initialization, the manager resets any ticket stuck in `running` status back to `pending` so the queue resumes gracefully on startup.
 
-
 ### 1.2 Agent Level (Worker Threads)
-* **Worker Wrapper (`src/worker/agentWorker.js`)**: Runs a dedicated thread per ticket. It manages a temporary `sessionContext` tracking checklist validation flags in thread memory.
+* **Worker Wrapper (`src/worker/agentWorker.js`)**: Runs a dedicated thread per ticket. It manages a temporary `sessionContext` tracking checklist validation flags in thread memory. It exits naturally upon successful loop completion or bubbles unhandled errors up to the parent thread's error listener.
 * **ReAct Executor (`src/agent/loop.js`)**: Runs the prompt loop. It sends the conversation history to the model, parses tool requests, handles JSON checkpointing, and enforces the token safety budget.
+
 * **Tool Registry (`src/agent/registry.js`)**: A dynamic plugin broker. It scans the `src/tools/` folder, auto-registers any tool defining a `schema` and a `handler` via dynamic ES imports, and intercepts the `idle` call to run checks.
 
 ### 1.3 Services Layer (Domain Services)
