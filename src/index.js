@@ -11,6 +11,7 @@ import { pool } from './worker/pool.js';
 import { startValorantWikiSync } from './services/valorantWikiSync.js';
 
 
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
