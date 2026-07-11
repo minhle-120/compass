@@ -38,7 +38,7 @@ graph TD
 ### 1.3 Services Layer (Domain Services)
 * **Ticket Service (`services/ticket/`)**: High-level repository pattern for ticket querying. Resolves ticket information and writes outcomes back to the queue.
 * **Incident Service (`services/incident/`)**: Isolates incident storage and lookup from the ticket queue.
-* **Knowledge Services (`services/wiki/`, `services/slang/`)**: Store editable game terminology in a dedicated local wiki database and query `MLBtrio/genz-slang-dataset` directly for Gen-Z slang. Source-owned wiki entries refresh every 24 hours without overwriting local edits.
+* **Knowledge Services (`services/wiki/`, `services/slang/`)**: Store editable game terminology and staff-managed slang in dedicated local SQLite databases. Slang lookup checks the local Compass slang wiki first, then the `MLBtrio/genz-slang-dataset`, then Urban Dictionary. Source-owned wiki entries refresh every 24 hours without overwriting local edits.
 
 
 ---
@@ -63,7 +63,7 @@ compass/
 │   ├── incident/              # Live incident lookup service
 │   ├── http/                  # Shared remote JSON client
 │   ├── wiki/                  # Local wiki database, importer, and refresh service
-│   └── slang/                 # Direct Hugging Face dataset provider
+│   └── slang/                 # Local slang wiki plus remote slang providers
 │
 └── src/                       # Agent Core
     ├── index.js               # Entry point & Express routes
@@ -164,12 +164,12 @@ To import the bundled, versioned snapshot without making a network request:
 npm run wiki:import
 ```
 
-To download the latest agents, abilities, ultimates, maps, weapons, and terminology, update the bundled snapshots, and import them:
+To download the latest agents, abilities, ultimates, maps, weapons, skins, cosmetics, progression references, and terminology, update the bundled snapshots, and import them:
 ```bash
 npm run wiki:refresh
 ```
 
-To refresh only the structured agent, map, and weapon catalog:
+To refresh only the structured Valorant API catalog:
 ```bash
 npm run wiki:catalog
 ```

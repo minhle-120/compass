@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="The editable Compass game terminology wiki.">
-  <title>Field Manual | Compass Wiki</title>
+  <meta name="description" content="The editable Compass slang dictionary.">
+  <title>Slang Desk | Compass Wiki</title>
   <link rel="stylesheet" href="/css/wiki.css">
   <script src="/js/theme.js"></script>
 </head>
@@ -21,8 +21,8 @@
       <a href="/submit.html">Submit Ticket</a>
       <a href="/tickets.html">Browse Tickets</a>
       <a href="/dashboard.html">Dashboard</a>
-      <a href="/wiki" class="active" aria-current="page">Wiki</a>
-      <a href="/slang">Slang</a>
+      <a href="/wiki">Wiki</a>
+      <a href="/slang" class="active" aria-current="page">Slang</a>
       <a href="/flags">Flagged Words</a>
       <button id="theme-toggle" class="button" style="padding: 4px 10px; min-height: 28px; line-height: 1;" aria-label="Toggle theme">
         <span class="theme-toggle-icon" aria-hidden="true">☾</span>
@@ -31,37 +31,36 @@
   </header>
 
   <main class="wiki-layout">
-    <aside class="catalog" aria-label="Wiki entries">
+    <aside class="catalog" aria-label="Slang entries">
       <div class="catalog-heading">
-        <p class="kicker">Index / A-Z</p>
-        <h1>Game language,<br>plainly explained.</h1>
+        <p class="kicker">Slang / A-Z</p>
+        <h1>Player slang,<br>kept editable.</h1>
       </div>
 
       <div class="search-wrap">
-        <label for="wiki-search">Search terms and explanations</label>
+        <label for="slang-search">Search terms and definitions</label>
         <div class="search-control">
           <span aria-hidden="true">/</span>
-          <input id="wiki-search" type="search" placeholder="Search the manual" autocomplete="off">
+          <input id="slang-search" type="search" placeholder="Search slang" autocomplete="off">
         </div>
       </div>
 
       <div class="filter-wrap">
         <label for="category-filter">Category</label>
         <select id="category-filter">
-          <option value="">All knowledge</option>
-          <option value="agent">Agents</option>
-          <option value="ability">Abilities</option>
-          <option value="ultimate">Ultimates</option>
-          <option value="map">Maps</option>
-          <option value="weapon">Weapons</option>
-          <option value="cosmetic">Cosmetics</option>
-          <option value="mechanic">Mechanics</option>
+          <option value="">All slang</option>
+          <option value="general">General</option>
+          <option value="gaming">Gaming</option>
+          <option value="chat">Chat</option>
+          <option value="meme">Meme</option>
+          <option value="platform">Platform</option>
+          <option value="sensitive">Sensitive</option>
         </select>
       </div>
 
       <div class="catalog-actions">
         <span id="entry-count">Loading entries...</span>
-        <button id="add-entry" class="button button-accent" type="button">+ New term</button>
+        <button id="add-entry" class="button button-accent" type="button">+ New slang</button>
       </div>
 
       <div id="entry-list" class="entry-list" aria-live="polite"></div>
@@ -69,56 +68,63 @@
 
     <section class="workspace">
       <div id="welcome-state" class="welcome-state">
-        <span class="edition-stamp">LOCAL EDITION</span>
-        <p class="kicker">Compass / Reference desk</p>
+        <span class="edition-stamp">LOCAL SLANG</span>
+        <p class="kicker">Compass / Slang desk</p>
         <h2>Choose a term<br>from the index.</h2>
-        <p>This wiki is the knowledge source used by the support agent. Every entry is intentionally reduced to a term and a clear text explanation.</p>
-        <div id="wiki-stats" class="wiki-stats" aria-live="polite"></div>
+        <p>This local slang dictionary is checked before remote sources. Use it for house definitions, safer wording, and terms the remote providers miss.</p>
+        <div id="slang-stats" class="wiki-stats" aria-live="polite"></div>
       </div>
 
       <article id="reader-state" class="reader-state" hidden>
         <div class="reader-toolbar">
           <div class="entry-badges">
             <span id="entry-category" class="origin-badge"></span>
-            <span id="entry-origin" class="origin-badge origin-muted"></span>
+            <span class="origin-badge origin-muted">Local source</span>
           </div>
           <div class="toolbar-actions">
             <button id="edit-entry" class="button" type="button">Edit</button>
             <button id="delete-entry" class="button button-danger" type="button">Delete</button>
           </div>
         </div>
-        <p class="kicker">Term / Definition</p>
+        <p class="kicker">Slang / Definition</p>
         <h2 id="entry-term"></h2>
         <div class="rule" aria-hidden="true"></div>
-        <p id="entry-explanation" class="entry-explanation"></p>
+        <p id="entry-definition" class="entry-explanation"></p>
+        <p id="entry-example" class="entry-updated"></p>
+        <p id="entry-notes" class="entry-updated"></p>
         <p id="entry-updated" class="entry-updated"></p>
       </article>
 
       <section id="editor-state" class="editor-state" hidden>
         <div class="editor-heading">
           <div>
-            <p class="kicker">Editorial desk</p>
-            <h2 id="editor-title">New term</h2>
+            <p class="kicker">Slang desk</p>
+            <h2 id="editor-title">New slang</h2>
           </div>
           <button id="cancel-edit" class="text-button" type="button">Cancel</button>
         </div>
         <form id="entry-form">
           <label for="term-input">Term</label>
-          <input id="term-input" name="term" type="text" maxlength="160" required placeholder="e.g. Counter-strafe">
+          <input id="term-input" name="term" type="text" maxlength="160" required placeholder="e.g. diff">
 
           <label for="category-input">Category</label>
           <select id="category-input" name="category" required>
-            <option value="agent">Agent</option>
-            <option value="ability">Ability</option>
-            <option value="ultimate">Ultimate</option>
-            <option value="map">Map</option>
-            <option value="weapon">Weapon</option>
-            <option value="cosmetic">Cosmetic</option>
-            <option value="mechanic" selected>Mechanic</option>
+            <option value="general" selected>General</option>
+            <option value="gaming">Gaming</option>
+            <option value="chat">Chat</option>
+            <option value="meme">Meme</option>
+            <option value="platform">Platform</option>
+            <option value="sensitive">Sensitive</option>
           </select>
 
-          <label for="explanation-input">Explanation</label>
-          <textarea id="explanation-input" name="explanation" maxlength="10000" required placeholder="Explain the term in plain text."></textarea>
+          <label for="definition-input">Definition</label>
+          <textarea id="definition-input" name="definition" maxlength="10000" required placeholder="Explain the slang in plain support-safe language."></textarea>
+
+          <label for="example-input">Example</label>
+          <textarea id="example-input" name="example" maxlength="5000" placeholder="Optional example sentence."></textarea>
+
+          <label for="notes-input">Notes</label>
+          <textarea id="notes-input" name="notes" maxlength="5000" placeholder="Optional staff notes, moderation cautions, or usage context."></textarea>
 
           <div class="editor-footer">
             <span id="character-count">0 / 10,000</span>
@@ -132,8 +138,8 @@
   <dialog id="delete-dialog">
     <form method="dialog" class="dialog-card">
       <p class="kicker">Permanent action</p>
-      <h2>Delete this term?</h2>
-      <p id="delete-copy">This removes the entry from the wiki and from agent search results.</p>
+      <h2>Delete this slang?</h2>
+      <p id="delete-copy">This removes the entry from the local slang dictionary and agent search results.</p>
       <div class="dialog-actions">
         <button class="button" value="cancel">Keep entry</button>
         <button id="confirm-delete" class="button button-danger" value="confirm">Delete permanently</button>
@@ -142,6 +148,6 @@
   </dialog>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="/js/wiki.js" type="module"></script>
+  <script src="/js/slang.js" type="module"></script>
 </body>
 </html>
