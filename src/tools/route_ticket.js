@@ -1,4 +1,4 @@
-// src/tools/route_ticket.js
+import { getTicket, updateTicketRouting } from '../database/sqlite.js';
 
 export const schema = {
   type: 'function',
@@ -24,5 +24,20 @@ export const schema = {
 };
 
 export async function handler(args, sessionContext) {
-  return 'Ticket routing stub';
+  const { ticketId } = sessionContext;
+  const { destination, reason } = args;
+  if (!ticketId) {
+    throw new Error('No ticket ID is available for routing.');
+  }
+
+  const ticket = getTicket(ticketId);
+  const previousDestination = ticket?.routing_destination;
+
+  updateTicketRouting(ticketId, destination, reason);
+
+  if (previousDestination && previousDestination !== destination) {
+    return `# Ticket rerouted\n\nPrevious destination: ${previousDestination}\nDestination: ${destination}\nReason: ${reason}`;
+  }
+
+  return `# Ticket routed\n\nDestination: ${destination}\nReason: ${reason}`;
 }
