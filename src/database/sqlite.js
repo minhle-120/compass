@@ -91,6 +91,7 @@ export function initDb() {
       ON problems(status, category, description_signature);
   `);
 
+<<<<<<< Updated upstream
   // Keep existing databases compatible when new workflow columns are added.
   const ticketColumns = new Set(
     db.prepare('PRAGMA table_info(tickets)').all().map((column) => column.name)
@@ -179,9 +180,26 @@ export function initDb() {
 
     insertMany(incidents);
   }
+=======
+  migrateTicketSchema(db);
+>>>>>>> Stashed changes
 
   logger.info(`SQLite database initialized at ${dbPath}`);
   return db;
+}
+
+export function migrateTicketSchema(database) {
+  const columns = new Set(database.prepare('PRAGMA table_info(tickets)').all().map((column) => column.name));
+  const migrations = [
+    ['resolution_type', 'TEXT'],
+    ['resolution_reason', 'TEXT'],
+    ['workflow_revision', 'INTEGER NOT NULL DEFAULT 0'],
+    ['draft_status', 'TEXT']
+  ];
+
+  for (const [name, definition] of migrations) {
+    if (!columns.has(name)) database.exec(`ALTER TABLE tickets ADD COLUMN ${name} ${definition}`);
+  }
 }
 
 export function getDb() {
@@ -328,6 +346,15 @@ export function updateTicketStatus(id, status, errorMessage = null) {
   `);
   const now = new Date().toISOString();
   stmt.run(status, errorMessage, now, id);
+}
+
+export function failRunningTicket(id, errorMessage) {
+  const info = getDb().prepare(`
+    UPDATE tickets
+    SET status = 'failed', error_message = ?, updated_at = ?
+    WHERE id = ? AND status = 'running'
+  `).run(errorMessage, new Date().toISOString(), id);
+  return info.changes === 1;
 }
 
 export function updateTicketClassification(id, categories, severity, rationale) {

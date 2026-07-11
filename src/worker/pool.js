@@ -4,7 +4,8 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
-import { getNextPendingTicket, updateTicketStatus } from '../database/sqlite.js';
+import { failRunningTicket, getNextPendingTicket, updateTicketStatus } from '../database/sqlite.js';
+import { errorMessage } from '../utils/errorMessage.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -133,7 +134,7 @@ class WorkerPool {
           } catch (termErr) {
             logger.error(`Failed to force terminate worker for ticket ${ticketId}`, 'WorkerPool', termErr);
           }
-          updateTicketStatus(ticketId, 'failed', `Execution timeout: no worker progress for ${config.workerTimeoutMs}ms`);
+          failRunningTicket(ticketId, `Execution timeout: no worker progress for ${config.workerTimeoutMs}ms`);
           this.activeWorkers.delete(worker);
           this.activeWorkersMap.delete(ticketId);
           this.checkQueue();
@@ -155,7 +156,7 @@ class WorkerPool {
       worker.on('error', (err) => {
         clearTimeout(watchdog);
         logger.error(`Error in worker for ticket ${ticketId}`, 'WorkerPool', err);
-        updateTicketStatus(ticketId, 'failed', err.message || String(err));
+        failRunningTicket(ticketId, errorMessage(err));
         this.activeWorkersMap.delete(ticketId);
       });
 
@@ -172,7 +173,7 @@ class WorkerPool {
 
     } catch (err) {
       logger.error(`Failed to instantiate worker for ticket ${ticketId}`, 'WorkerPool', err);
-      updateTicketStatus(ticketId, 'failed', `Failed to spawn worker: ${err.message}`);
+      failRunningTicket(ticketId, `Failed to spawn worker: ${errorMessage(err)}`);
       this.activeWorkersMap.delete(ticketId);
     }
   }
