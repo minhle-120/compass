@@ -27,6 +27,19 @@ describe('SQLite Database Queue Layer', () => {
     db.prepare('DELETE FROM tickets').run();
   });
 
+  it('should seed the five default incidents when the incident table is empty', () => {
+    const db = initDb();
+    const incidents = db.prepare('SELECT id FROM incident ORDER BY id').all();
+
+    expect(incidents).toEqual([
+      { id: 'INC-001' },
+      { id: 'INC-002' },
+      { id: 'INC-003' },
+      { id: 'INC-004' },
+      { id: 'INC-005' }
+    ]);
+  });
+
   it('should insert and retrieve a ticket with JSON fields parsed correctly', () => {
     const mockTicket = {
       id: 'T-1001',

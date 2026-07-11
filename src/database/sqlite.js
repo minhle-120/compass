@@ -45,45 +45,155 @@ export function initDb() {
       routing_destination TEXT,
       routing_reason TEXT,
       draft_response TEXT,
-      draft_status TEXT,
       error_message TEXT,
+      workflow_revision INTEGER NOT NULL DEFAULT 0,
       resolution_type TEXT,
       resolution_reason TEXT,
-      workflow_revision INTEGER NOT NULL DEFAULT 0
+      draft_status TEXT
     );
 
-    CREATE TABLE IF NOT EXISTS problems (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+    CREATE TABLE IF NOT EXISTS incident (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      summary TEXT NOT NULL,
       category TEXT NOT NULL,
       severity TEXT NOT NULL,
-      reason TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open', 'resolved', 'closed')),
-      source TEXT NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
-      description_signature TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      keywords TEXT,
+      region TEXT,
+      platform TEXT
     );
 
-    CREATE TABLE IF NOT EXISTS problem_tickets (
-      problem_id INTEGER NOT NULL REFERENCES problems(id) ON DELETE CASCADE,
-      ticket_id TEXT NOT NULL UNIQUE REFERENCES tickets(id) ON DELETE CASCADE,
-      linked_at TEXT NOT NULL,
-      PRIMARY KEY (problem_id, ticket_id)
+    CREATE INDEX IF NOT EXISTS idx_incident_category ON incident(category);
+    CREATE INDEX IF NOT EXISTS idx_incident_severity ON incident(severity);
+    CREATE INDEX IF NOT EXISTS idx_incident_region ON incident(region);
+    CREATE INDEX IF NOT EXISTS idx_incident_platform ON incident(platform);
+
+    CREATE TABLE IF NOT EXISTS kb_articles (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'published',
+      platforms TEXT, /* JSON array of strings */
+      game_versions TEXT,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      summary TEXT NOT NULL,
+      excerpt TEXT NOT NULL DEFAULT '',
+      content TEXT NOT NULL
     );
 
-    CREATE INDEX IF NOT EXISTS idx_problems_open_category_signature
-      ON problems(status, category, description_signature);
+    CREATE TABLE IF NOT EXISTS slang (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      slang TEXT NOT NULL UNIQUE COLLATE NOCASE,
+      description TEXT NOT NULL,
+      example TEXT,
+      context TEXT,
+      source TEXT NOT NULL CHECK(source IN ('genz', 'game'))
+    );
+
+    CREATE TABLE IF NOT EXISTS slang_terms (
+      term TEXT PRIMARY KEY,
+      canonical_form TEXT,
+      language TEXT,
+      meaning TEXT NOT NULL,
+      common_uses TEXT, /* JSON array of strings */
+      interpretation_notes TEXT,
+      related_terms TEXT /* JSON array of strings */
+    );
+    
+    CREATE TABLE IF NOT EXISTS unknown_slang (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      term TEXT NOT NULL,
+      context TEXT NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
-  const ticketColumns = db.prepare('PRAGMA table_info(tickets)').all();
-  if (!ticketColumns.some((column) => column.name === 'resolution_reason')) {
-    db.exec('ALTER TABLE tickets ADD COLUMN resolution_reason TEXT');
+  // Keep existing databases compatible when new workflow columns are added.
+  const ticketColumns = new Set(
+    db.prepare('PRAGMA table_info(tickets)').all().map((column) => column.name)
+  );
+  const missingTicketColumns = [
+    ['workflow_revision', 'INTEGER NOT NULL DEFAULT 0'],
+    ['resolution_type', 'TEXT'],
+    ['resolution_reason', 'TEXT'],
+    ['draft_status', 'TEXT']
+  ];
+  for (const [name, definition] of missingTicketColumns) {
+    if (!ticketColumns.has(name)) {
+      db.exec(`ALTER TABLE tickets ADD COLUMN ${name} ${definition}`);
+    }
   }
-  if (!ticketColumns.some((column) => column.name === 'workflow_revision')) {
-    db.exec('ALTER TABLE tickets ADD COLUMN workflow_revision INTEGER NOT NULL DEFAULT 0');
-  }
-  if (!ticketColumns.some((column) => column.name === 'draft_status')) {
-    db.exec('ALTER TABLE tickets ADD COLUMN draft_status TEXT');
+
+  const incidentCount = db
+    .prepare('SELECT COUNT(*) AS count FROM incident')
+    .get().count;
+
+  if (incidentCount === 0) {
+    const insertIncident = db.prepare(`
+      INSERT INTO incident (
+        id, title, summary, category, severity, keywords, region, platform
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const incidents = [
+      [
+        'INC-001',
+        'Players Unable to Log In',
+        'Players receive an authentication error when attempting to log in during peak hours.',
+        'Authentication',
+        'critical',
+        'login, authentication, error, account access',
+        'Southeast Asia',
+        'PC'
+      ],
+      [
+        'INC-002',
+        'Missing Purchased Items',
+        'Some players completed purchases but the purchased items did not appear in their inventory.',
+        'Payment',
+        'high',
+        'purchase, payment, missing item, inventory',
+        'Global',
+        'Mobile'
+      ],
+      [
+        'INC-003',
+        'High Matchmaking Latency',
+        'Players experience long matchmaking times and increased latency when joining ranked matches.',
+        'Performance',
+        'medium',
+        'matchmaking, latency, lag, ranked match',
+        'Asia',
+        'PC'
+      ],
+      [
+        'INC-004',
+        'Game Crashes After Latest Update',
+        'The game crashes on startup for some Android devices after installing the latest update.',
+        'Crash',
+        'high',
+        'crash, startup, update, android',
+        'Global',
+        'Android'
+      ],
+      [
+        'INC-005',
+        'Incorrect Ranked Rewards',
+        'Some players received rewards for the wrong rank after the competitive season ended.',
+        'Rewards',
+        'medium',
+        'ranked, rewards, season, incorrect reward',
+        'Europe',
+        'PC'
+      ]
+    ];
+
+    const insertMany = db.transaction((rows) => {
+      for (const incident of rows) {
+        insertIncident.run(...incident);
+      }
+    });
+
+    insertMany(incidents);
   }
 
   logger.info(`SQLite database initialized at ${dbPath}`);
@@ -113,17 +223,18 @@ export function resetInterruptedTickets() {
 
 export function getNextPendingTicket(excludedIds = []) {
   const database = getDb();
-  const exclusions = excludedIds.length
-    ? `AND id NOT IN (${excludedIds.map(() => '?').join(', ')})`
+  const validExcludedIds = Array.isArray(excludedIds) ? excludedIds.filter(Boolean) : [];
+  const exclusion = validExcludedIds.length
+    ? `AND id NOT IN (${validExcludedIds.map(() => '?').join(', ')})`
     : '';
   const stmt = database.prepare(`
     SELECT * FROM tickets
     WHERE status = 'pending'
-    ${exclusions}
+    ${exclusion}
     ORDER BY created_at ASC
     LIMIT 1
   `);
-  return stmt.get(...excludedIds);
+  return stmt.get(...validExcludedIds);
 }
 
 export function getTicket(id) {
@@ -137,6 +248,91 @@ export function getTicket(id) {
     if (ticket.categories) ticket.categories = JSON.parse(ticket.categories);
   }
   return ticket;
+}
+
+export function searchIncidents(query) {
+  const database = getDb();
+  const normalizedQuery = typeof query === 'string' ? query.trim().toLowerCase() : '';
+  if (!normalizedQuery) return [];
+
+  const terms = normalizedQuery.split(/\s+/).filter(Boolean);
+  const incidents = database.prepare(`
+    SELECT id, title, summary, category, severity, keywords, region, platform
+    FROM incident
+  `).all();
+
+  return incidents
+    .map((incident) => {
+      const searchableText = [
+        incident.title,
+        incident.summary,
+        incident.category,
+        incident.severity,
+        incident.keywords,
+        incident.region,
+        incident.platform
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      const score = terms.reduce(
+        (total, term) => total + (searchableText.includes(term) ? 1 : 0),
+        0
+      );
+
+      return { ...incident, score };
+    })
+    .filter((incident) => incident.score > 0)
+    .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))
+    .slice(0, 5);
+}
+
+export function getIncident(id) {
+  const database = getDb();
+  const stmt = database.prepare(`SELECT * FROM incident WHERE lower(id) = lower(?)`);
+  return stmt.get(id);
+}
+
+export function searchKnowledgeBase(query) {
+  const database = getDb();
+  const normalizedQuery = typeof query === 'string' ? query.trim().toLowerCase() : '';
+  if (!normalizedQuery) return [];
+
+  const terms = normalizedQuery.split(/\s+/).filter(Boolean);
+  const articles = database.prepare(`
+    SELECT id, title, status, platforms, game_versions, updated_at, summary, excerpt
+    FROM kb_articles
+  `).all();
+
+  return articles
+    .map((article) => {
+      const searchableText = [
+        article.title,
+        article.summary,
+        article.excerpt,
+        article.platforms,
+        article.game_versions
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      const score = terms.reduce(
+        (total, term) => total + (searchableText.includes(term) ? 1 : 0),
+        0
+      );
+      return { ...article, score };
+    })
+    .filter((article) => article.score > 0)
+    .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))
+    .slice(0, 5);
+}
+
+export function getKnowledgeBaseArticle(id) {
+  const database = getDb();
+  return database.prepare(`
+    SELECT * FROM kb_articles WHERE lower(id) = lower(?)
+  `).get(id);
 }
 
 export function updateTicketStatus(id, status, errorMessage = null) {
@@ -176,126 +372,137 @@ export function updateTicketDraft(id, draftResponse) {
   const database = getDb();
   const stmt = database.prepare(`
     UPDATE tickets
-    SET draft_response = ?, draft_status = 'drafted', updated_at = ?
+    SET draft_response = ?, updated_at = ?
     WHERE id = ?
   `);
   const now = new Date().toISOString();
   stmt.run(draftResponse, now, id);
 }
 
-export function finalizeTicket(id, status, resolutionType, resolutionReason, { draftResponseMode = 'staff_review' } = {}) {
+export function getQueueStats() {
   const database = getDb();
-  const finalize = database.transaction(() => {
-    const now = new Date().toISOString();
-    const ticket = database.prepare(`
-      SELECT status, conversation, draft_response
-      FROM tickets
-      WHERE id = ?
-    `).get(id);
-    if (!ticket) throw new Error(`Ticket "${id}" not found during finalization.`);
-    if (ticket.status !== 'running') return { status: ticket.status, finalized: false };
+  const stats = {
+    pending: 0,
+    running: 0,
+    completed: 0,
+    escalated: 0,
+    failed: 0
+  };
+  const rows = database.prepare(`
+    SELECT status, COUNT(*) AS count FROM tickets GROUP BY status
+  `).all();
+  for (const row of rows) {
+    if (row.status in stats) stats[row.status] = row.count;
+  }
+  return stats;
+}
 
-    let conversation = null;
+function parseConversation(value) {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function appendTicketMessage(id, sender, message) {
+  const database = getDb();
+  return database.transaction(() => {
+    const ticket = database.prepare('SELECT * FROM tickets WHERE id = ?').get(id);
+    if (!ticket) return null;
+
+    const conversation = parseConversation(ticket.conversation);
+    const timestamp = new Date().toISOString();
+    if (ticket.status !== 'running' && ticket.draft_response && ticket.draft_status !== 'pending_review') {
+      conversation.push({ sender: 'agent', timestamp, message: ticket.draft_response });
+    }
+    conversation.push({ sender, timestamp, message });
+
+    database.prepare(`
+      UPDATE tickets
+      SET conversation = ?, status = 'pending', workflow_revision = workflow_revision + 1,
+          categories = NULL, severity = NULL, rationale = NULL,
+          routing_destination = NULL, routing_reason = NULL,
+          draft_response = NULL, draft_status = NULL,
+          resolution_type = NULL, resolution_reason = NULL,
+          error_message = NULL, updated_at = ?
+      WHERE id = ?
+    `).run(JSON.stringify(conversation), timestamp, id);
+    return getTicket(id);
+  })();
+}
+
+export function finalizeTicket(
+  id,
+  status,
+  resolutionType = null,
+  resolutionReason = null,
+  { draftResponseMode = 'staff_review' } = {}
+) {
+  const database = getDb();
+  return database.transaction(() => {
+    const ticket = database.prepare('SELECT * FROM tickets WHERE id = ?').get(id);
+    if (!ticket) throw new Error(`Ticket "${id}" not found during finalization`);
+
+    // A player reply changes the ticket back to pending. Do not let an older
+    // worker overwrite that newer revision when it finishes.
+    if (ticket.status !== 'running') {
+      return { status: ticket.status, finalized: false };
+    }
+
+    const now = new Date().toISOString();
+    let conversation = parseConversation(ticket.conversation);
     let draftResponse = ticket.draft_response;
-    let draftStatus = draftResponse ? 'pending_review' : null;
-    if (draftResponseMode === 'auto_response' && draftResponse) {
-      try { conversation = ticket.conversation ? JSON.parse(ticket.conversation) : []; } catch { conversation = []; }
+    let draftStatus = null;
+    if (draftResponse && draftResponseMode === 'auto_response') {
       conversation.push({ sender: 'agent', timestamp: now, message: draftResponse });
       draftResponse = null;
       draftStatus = 'published';
+    } else if (draftResponse) {
+      draftStatus = 'pending_review';
     }
 
-    const info = database.prepare(`
+    database.prepare(`
       UPDATE tickets
       SET status = ?, resolution_type = ?, resolution_reason = ?,
-          conversation = COALESCE(?, conversation), draft_response = ?, draft_status = ?,
+          conversation = ?, draft_response = ?, draft_status = ?,
           error_message = NULL, updated_at = ?
-      WHERE id = ? AND status = 'running'
+      WHERE id = ?
     `).run(
       status,
       resolutionType,
       resolutionReason,
-      conversation ? JSON.stringify(conversation) : null,
+      JSON.stringify(conversation),
       draftResponse,
       draftStatus,
       now,
       id
     );
-
-    if (info.changes === 1) return { status, finalized: true };
-    return { status: database.prepare('SELECT status FROM tickets WHERE id = ?').get(id).status, finalized: false };
-  });
-
-  return finalize();
+    return { status, finalized: true };
+  })();
 }
 
 export function publishDraftResponse(id) {
   const database = getDb();
-  const publish = database.transaction(() => {
-    const ticket = database.prepare(`
-      SELECT conversation, draft_response, draft_status
-      FROM tickets
-      WHERE id = ?
-    `).get(id);
-    if (!ticket) throw new Error(`Ticket "${id}" not found.`);
+  return database.transaction(() => {
+    const ticket = database.prepare('SELECT * FROM tickets WHERE id = ?').get(id);
+    if (!ticket) throw new Error(`Ticket "${id}" not found`);
     if (!ticket.draft_response || ticket.draft_status !== 'pending_review') {
       return { published: false, reason: 'No draft is awaiting staff review.' };
     }
 
-    let conversation = [];
-    try { conversation = ticket.conversation ? JSON.parse(ticket.conversation) : []; } catch { conversation = []; }
     const now = new Date().toISOString();
+    const conversation = parseConversation(ticket.conversation);
     conversation.push({ sender: 'agent', timestamp: now, message: ticket.draft_response });
     database.prepare(`
       UPDATE tickets
       SET conversation = ?, draft_response = NULL, draft_status = 'published', updated_at = ?
       WHERE id = ?
     `).run(JSON.stringify(conversation), now, id);
-
     return { published: true };
-  });
-  return publish();
-}
-
-export function appendTicketMessage(id, sender, message) {
-  const database = getDb();
-  const append = database.transaction(() => {
-    const ticket = database.prepare(`
-      SELECT status, conversation, draft_response, draft_status, updated_at
-      FROM tickets
-      WHERE id = ?
-    `).get(id);
-    if (!ticket) return null;
-
-    let conversation = [];
-    if (ticket.conversation) {
-      try { conversation = JSON.parse(ticket.conversation); } catch { conversation = []; }
-    }
-    const draftWasVisible = ticket.status !== 'pending'
-      && ticket.status !== 'running'
-      && ticket.draft_status !== 'pending_review';
-    if (sender === 'player' && draftWasVisible && ticket.draft_response) {
-      conversation.push({
-        sender: 'agent',
-        timestamp: ticket.updated_at || new Date().toISOString(),
-        message: ticket.draft_response
-      });
-    }
-    conversation.push({ sender, timestamp: new Date().toISOString(), message });
-
-    const now = new Date().toISOString();
-    database.prepare(`
-      UPDATE tickets
-      SET conversation = ?, status = 'pending', workflow_revision = workflow_revision + 1,
-          draft_response = NULL, draft_status = NULL,
-          resolution_type = NULL, resolution_reason = NULL,
-          updated_at = ?
-      WHERE id = ?
-    `).run(JSON.stringify(conversation), now, id);
-
-    return database.prepare('SELECT workflow_revision FROM tickets WHERE id = ?').get(id);
-  });
-  return append();
+  })();
 }
 
 export function insertTicket(ticket) {
@@ -338,78 +545,4 @@ export function insertTicket(ticket) {
     attachments: ticket.attachments ? JSON.stringify(ticket.attachments) : null,
     conversation: ticket.conversation ? JSON.stringify(ticket.conversation) : null
   });
-}
-
-export function getQueueStats() {
-  const database = getDb();
-  const stmt = database.prepare('SELECT status, COUNT(*) as count FROM tickets GROUP BY status');
-  const rows = stmt.all();
-  const stats = { pending: 0, running: 0, completed: 0, escalated: 0, failed: 0 };
-  for (const row of rows) {
-    stats[row.status] = row.count;
-  }
-  return stats;
-}
-
-export function clusterTicketIntoProblem(ticketId, category, severity, reason) {
-  const database = getDb();
-  const ticket = getTicket(ticketId);
-  if (!ticket) {
-    throw new Error(`Ticket "${ticketId}" not found.`);
-  }
-
-  // Ignore casing, punctuation, and repeated whitespace when comparing reports.
-  const descriptionSignature = String(ticket.description || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
-  if (!descriptionSignature) {
-    throw new Error(`Ticket "${ticketId}" has no description to compare.`);
-  }
-
-  const existingLink = database.prepare(`
-    SELECT p.id, p.category, p.severity, p.reason, p.status, p.source
-    FROM problem_tickets pt
-    JOIN problems p ON p.id = pt.problem_id
-    WHERE pt.ticket_id = ?
-  `).get(ticketId);
-  if (existingLink) {
-    return { problem: existingLink, action: 'already_linked' };
-  }
-
-  const matchingProblem = database.prepare(`
-    SELECT id, category, severity, reason, status, source
-    FROM problems
-    WHERE status = 'open' AND category = ? AND description_signature = ?
-    LIMIT 1
-  `).get(category, descriptionSignature);
-
-  const now = new Date().toISOString();
-  if (matchingProblem) {
-    database.prepare(`
-      INSERT INTO problem_tickets (problem_id, ticket_id, linked_at)
-      VALUES (?, ?, ?)
-    `).run(matchingProblem.id, ticketId, now);
-    return { problem: matchingProblem, action: 'added_to_pile' };
-  }
-
-  const result = database.prepare(`
-    INSERT INTO problems (
-      category, severity, reason, status, source, description_signature, created_at, updated_at
-    ) VALUES (?, ?, ?, 'open', ?, ?, ?, ?)
-  `).run(category, severity, reason, ticketId, descriptionSignature, now, now);
-
-  const problem = {
-    id: Number(result.lastInsertRowid),
-    category,
-    severity,
-    reason,
-    status: 'open',
-    source: ticketId
-  };
-  database.prepare(`
-    INSERT INTO problem_tickets (problem_id, ticket_id, linked_at)
-    VALUES (?, ?, ?)
-  `).run(problem.id, ticketId, now);
-  return { problem, action: 'created_problem' };
 }
