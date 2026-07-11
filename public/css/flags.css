@@ -1,0 +1,98 @@
+.flags-page {
+  width: min(1320px, 100%);
+  margin: 0 auto;
+  padding: clamp(30px, 5vw, 68px) clamp(18px, 4vw, 52px) 80px;
+}
+
+.flags-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, .65fr);
+  align-items: end;
+  gap: clamp(28px, 7vw, 100px);
+  padding-bottom: 42px;
+  border-bottom: 1px solid var(--ink);
+}
+
+.flags-hero h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(52px, 8vw, 104px);
+  font-weight: 500;
+  line-height: .86;
+  letter-spacing: -.055em;
+}
+
+.flags-hero > p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.flag-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-left: 1px solid var(--line);
+  margin: 34px 0;
+}
+
+.flag-stat {
+  padding: 18px 20px;
+  background: rgba(251, 250, 245, .72);
+  border-top: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.flag-stat strong { display: block; font-family: var(--display); font-size: 34px; }
+.flag-stat span { color: var(--ink-soft); font-family: var(--mono); font-size: 10px; text-transform: uppercase; }
+
+.flag-controls {
+  display: grid;
+  grid-template-columns: 1fr 220px;
+  gap: 18px;
+  margin-bottom: 22px;
+}
+.flag-controls label { display: block; margin-bottom: 6px; color: var(--ink-soft); font-family: var(--mono); font-size: 10px; text-transform: uppercase; }
+.flag-controls input, .flag-controls select { width: 100%; min-height: 44px; padding: 10px 12px; color: var(--ink); background: var(--paper-bright); border: 1px solid var(--ink); border-radius: 0; }
+
+.flag-ledger { background: var(--paper-bright); border: 1px solid var(--ink); box-shadow: 7px 7px 0 var(--ink); }
+.ledger-heading { min-height: 58px; padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--ink); font-family: var(--mono); font-size: 11px; text-transform: uppercase; }
+
+.flag-row {
+  display: grid;
+  grid-template-columns: minmax(150px, .7fr) minmax(260px, 1.5fr) 110px 170px;
+  gap: 18px;
+  padding: 20px 16px;
+  align-items: start;
+  border-bottom: 1px solid var(--line);
+}
+.flag-row:last-child { border-bottom: 0; }
+.flag-word { margin: 0 0 5px; font-family: var(--display); font-size: 27px; overflow-wrap: anywhere; }
+.flag-meta, .flag-context, .flag-time { color: var(--ink-soft); font-size: 12px; line-height: 1.55; }
+.flag-context { margin: 0; color: var(--ink); font-size: 14px; }
+.flag-reason { margin: 8px 0 0; color: var(--ink-soft); font-style: italic; }
+.flag-ticket { color: var(--signal-dark); font-family: var(--mono); font-size: 11px; }
+.flag-status { display: inline-block; margin-bottom: 8px; padding: 5px 8px; background: var(--aqua); font-family: var(--mono); font-size: 9px; text-transform: uppercase; }
+.flag-status.resolved { background: #cce7c8; }
+.flag-status.ignored { background: #ddd8cc; }
+.flag-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.flag-actions .button { min-height: 29px; padding: 4px 8px; font-size: 9px; }
+.flag-decision { color: var(--ink-soft); font-family: var(--mono); font-size: 10px; text-transform: uppercase; }
+.flag-empty { padding: 60px 20px; text-align: center; color: var(--ink-soft); }
+
+#add-word-dialog .dialog-card { width: min(620px, calc(100vw - 32px)); }
+#add-word-dialog .dialog-card h2 { margin-bottom: 12px; }
+#add-word-dialog label { display: block; margin: 18px 0 6px; font-family: var(--mono); font-size: 10px; font-weight: 700; text-transform: uppercase; }
+#add-word-dialog input, #add-word-dialog select, #add-word-dialog textarea { width: 100%; padding: 12px; color: var(--ink); background: var(--paper-bright); border: 1px solid var(--ink); border-radius: 0; }
+#add-word-dialog textarea { min-height: 170px; resize: vertical; font-family: var(--display); font-size: 18px; line-height: 1.5; }
+
+@media (max-width: 900px) {
+  .flags-hero { grid-template-columns: 1fr; }
+  .flag-row { grid-template-columns: 1fr 1fr; }
+  .flag-stats { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 600px) {
+  .flag-controls, .flag-row { grid-template-columns: 1fr; }
+  .flags-hero h1 { font-size: 54px; }
+}

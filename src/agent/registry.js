@@ -3,6 +3,7 @@ import { readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { logger } from '../utils/logger.js';
+import { hasExactKnowledgeMatch, normalizeUnknownWord } from '../utils/unknownWord.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -64,6 +65,26 @@ export async function executeTool(name, args, sessionContext) {
     };
   }
 
+  if (name === 'flag_unknown_word') {
+    const key = normalizeUnknownWord(args.word);
+    const evidence = sessionContext.unknownWordChecks?.[key];
+    const missing = [];
+    if (!evidence?.slangMiss) missing.push('query_slang_dictionary with the exact word');
+    if (!evidence?.knowledgeMiss) missing.push('search_knowledge_base with the exact word');
+    if (missing.length) {
+      return {
+        ok: false,
+        terminal: false,
+        error: {
+          code: 'LOOKUP_REQUIRED',
+          message: `Cannot flag "${args.word || ''}" until these no-result checks succeed: ${missing.join(', ')}.`,
+          retryable: false
+        },
+        missingSteps: missing
+      };
+    }
+  }
+
   // Intercept the idle tool to perform the Local In-Worker Validation Check
   if (name === 'idle') {
     const resolutionType = args.resolution_type;
@@ -107,6 +128,15 @@ export async function executeTool(name, args, sessionContext) {
 
   try {
     const result = await tool.handler(args, sessionContext);
+    if (name === 'query_slang_dictionary') {
+      const key = normalizeUnknownWord(args.term);
+      const checks = getUnknownWordChecks(sessionContext, key);
+      checks.slangMiss = typeof result === 'string' && result.startsWith('No slang definition found');
+    } else if (name === 'search_knowledge_base') {
+      const key = normalizeUnknownWord(args.query);
+      const checks = getUnknownWordChecks(sessionContext, key);
+      checks.knowledgeMiss = !hasExactKnowledgeMatch(result, args.query);
+    }
     if (name === 'read_ticket') {
       sessionContext.flags.wasTicketRead = true;
     } else if (name === 'classify_ticket') {
@@ -135,4 +165,10 @@ export async function executeTool(name, args, sessionContext) {
       }
     };
   }
+}
+
+function getUnknownWordChecks(sessionContext, key) {
+  sessionContext.unknownWordChecks ||= {};
+  sessionContext.unknownWordChecks[key] ||= { slangMiss: false, knowledgeMiss: false };
+  return sessionContext.unknownWordChecks[key];
 }

@@ -21,6 +21,7 @@ async function start() {
   const sessionContext = {
     ticketId,
     workflowRevision: ticket.workflow_revision || 0,
+    unknownWordChecks: {},
     flags: {
       wasTicketRead: false,
       wasClassified: false,
