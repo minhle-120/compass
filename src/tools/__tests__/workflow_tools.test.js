@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 process.env.DB_PATH = ':memory:';
 process.env.WIKI_DB_PATH = ':memory:';
+process.env.INCIDENT_DB_PATH = ':memory:';
 
 const { getTicket, initDb, insertTicket } = await import('../../database/sqlite.js');
 const { initWikiDb } = await import('../../../services/wiki/wikiService.js');
@@ -53,6 +54,8 @@ describe('support workflow tools', () => {
     const result = await readTicket({}, context);
     expect(result).toEqual(expect.objectContaining({
       id: 'T-ANDROID',
+      platform: 'Android',
+      region: 'Global',
       description: expect.stringContaining('crashes on startup')
     }));
   });

@@ -25,6 +25,8 @@ describe('Read Ticket Tool', () => {
       description: 'The game is lagging.',
       status: 'pending',
       account_id: 'internal-account',
+      platform: 'PC',
+      region: 'Asia',
       conversation: [{ sender: 'player', message: 'It happens every match.' }]
     };
     insertTicket(mockTicket);
@@ -36,6 +38,8 @@ describe('Read Ticket Tool', () => {
       id: 'T-READ-TEST',
       subject: 'Network lag',
       description: 'The game is lagging.',
+      platform: 'PC',
+      region: 'Asia',
       conversation: [{ sender: 'player', message: 'It happens every match.' }]
     });
     expect(result).not.toHaveProperty('status');

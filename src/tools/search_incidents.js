@@ -1,18 +1,37 @@
 // src/tools/search_incidents.js
-import { searchIncidents as searchPrimaryIncidents } from '../database/sqlite.js';
 import { searchIncidents as searchIncidentService } from '../../services/incident/incidentService.js';
 
 export const schema = {
   type: 'function',
   function: {
     name: 'search_incidents',
-    description: 'Search the known incident database for incidents matching the player issue. Returns matching incident IDs and summaries ranked by relevance.',
+    description: 'Search known incidents for the player issue. Returns relevance-ranked matches with scores and the terms that matched.',
     parameters: {
       type: 'object',
       properties: {
         query: {
           type: 'string',
           description: 'Keywords describing the player issue, such as login error or missing purchased item.'
+        },
+        limit: {
+          type: 'integer',
+          minimum: 1,
+          maximum: 20,
+          default: 5,
+          description: 'Maximum number of incident matches to return.'
+        },
+        platform: {
+          type: 'string',
+          description: 'Optional exact platform filter, such as PC, Mobile, or Android.'
+        },
+        region: {
+          type: 'string',
+          description: 'Optional exact region filter, such as Asia, Europe, Global, or Southeast Asia.'
+        },
+        status: {
+          type: 'string',
+          enum: ['active', 'monitoring', 'resolved'],
+          description: 'Optional incident lifecycle status filter.'
         }
       },
       required: ['query']
@@ -26,10 +45,13 @@ export async function handler(args, sessionContext) {
     throw new TypeError('query must be a non-empty string');
   }
 
-  let result = searchIncidentService(query);
-  if (result.incidents.length === 0) {
-    result = { incidents: searchPrimaryIncidents(query) };
-  }
+  const limit = Math.min(Math.max(Number.parseInt(args?.limit, 10) || 5, 1), 20);
+  const result = searchIncidentService(query, {
+    limit,
+    platform: args?.platform,
+    region: args?.region,
+    status: args?.status
+  });
   if (sessionContext) {
     sessionContext.matchedIncident = result.incidents[0] || null;
   }

@@ -22,6 +22,8 @@ export async function handler(args, sessionContext) {
     id: ticket.id,
     subject: ticket.subject || '',
     description: ticket.description || '',
+    platform: ticket.platform || null,
+    region: ticket.region || null,
     conversation: Array.isArray(ticket.conversation) ? ticket.conversation : []
   };
 }
