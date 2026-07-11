@@ -1,6 +1,6 @@
 // src/tools/search_knowledge_base.js
 import { getDb } from '../database/sqlite.js';
-import { ensureKnowledgeBaseTable, searchReferenceKnowledge } from '../database/knowledgeBase.js';
+import { ensureKnowledgeBaseTable, searchReferenceKnowledge } from '../../services/kb/kbService.js';
 
 const STOP_WORDS = new Set([
   'a', 'an', 'and', 'are', 'as', 'at', 'be', 'for', 'from', 'i', 'in',
@@ -74,8 +74,6 @@ export async function handler(args, sessionContext) {
         summary,
         status,
         updated_at,
-        source,
-        source_url,
         CASE
           WHEN lower(id) = lower(?) THEN 100
           WHEN lower(title) = lower(?) THEN 80
@@ -95,8 +93,7 @@ export async function handler(args, sessionContext) {
       summary: row.summary,
       status: row.status,
       updated_at: row.updated_at,
-      source: row.source || 'local',
-      source_url: row.source_url,
+      source: 'knowledge_base_article',
       relevance: row.relevance
     }));
 
