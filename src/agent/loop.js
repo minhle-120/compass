@@ -8,6 +8,7 @@ import { errorMessage } from '../utils/errorMessage.js';
 import { assertValidTicketId } from '../utils/ticketId.js';
 import { hasExactKnowledgeMatch, normalizeUnknownWord } from '../utils/unknownWord.js';
 import { finalizeTicket } from '../database/sqlite.js';
+import { deleteResolvedTicket } from '../services/ticketDeletion.js';
 import { executeTool, getOpenAITools } from './registry.js';
 import { parentPort, threadId } from 'worker_threads';
 
@@ -442,5 +443,20 @@ export async function runAgentLoop(sessionContext) {
     sessionContext.resolutionReason || (exitStatus === 'escalated' ? 'Context token limit reached' : null),
     { draftResponseMode: config.draftResponseMode }
   );
+
+  if (
+    sessionContext.deleteAfterResolution
+    && finalized.finalized
+    && finalized.status === 'completed'
+    && sessionContext.resolutionType === 'resolved'
+  ) {
+    try {
+      const deletion = deleteResolvedTicket(ticketId);
+      return { status: 'deleted', finalized: true, deletion };
+    } catch (error) {
+      logger.error(`Ticket ${ticketId} was resolved but deferred deletion failed`, `Ticket-${ticketId}`, error);
+    }
+  }
+
   return { status: finalized.status, finalized: finalized.finalized };
 }

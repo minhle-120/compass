@@ -10,6 +10,7 @@ import { isValidTicketId } from './utils/ticketId.js';
 import { normalizeTicketSubmission } from './utils/ticketSubmission.js';
 import { presentTicket } from './utils/ticketPresentation.js';
 import { initDb, resetInterruptedTickets, getTicket, insertTicket, getDb, getQueueStats, appendTicketMessage, publishDraftResponse } from './database/sqlite.js';
+import { deleteResolvedTicket, TicketDeletionError } from './services/ticketDeletion.js';
 import { pool } from './worker/pool.js';
 import {
   WikiValidationError,
@@ -199,6 +200,24 @@ app.get('/api/tickets/:id', (req, res) => {
   }
 });
 
+app.delete('/api/tickets/:id', (req, res) => {
+  try {
+    const result = deleteResolvedTicket(req.params.id);
+    logger.info(`Permanently deleted resolved ticket ${req.params.id}`, 'ExpressAPI');
+    return res.json(result);
+  } catch (err) {
+    if (err instanceof TypeError) {
+      return res.status(400).json({ error: err.message });
+    }
+    if (err instanceof TicketDeletionError) {
+      const status = err.code === 'TICKET_NOT_FOUND' ? 404 : 409;
+      return res.status(status).json({ error: err.message, code: err.code });
+    }
+    logger.error(`Failed to delete ticket ${req.params.id}`, 'ExpressAPI', err);
+    return res.status(500).json({ error: 'Failed to delete ticket' });
+  }
+});
+
 // Staff action to approve and publish a pending AI draft.
 app.post('/api/tickets/:id/draft/approve', (req, res) => {
   try {
@@ -219,6 +238,7 @@ app.post('/api/tickets/:id/draft/approve', (req, res) => {
 app.get('/api/tickets/:id/history', (req, res) => {
   try {
     if (!isValidTicketId(req.params.id)) return res.status(400).json({ error: 'Invalid ticket ID' });
+    if (!getTicket(req.params.id)) return res.status(404).json({ error: 'Ticket not found' });
     const historyPath = join(config.historyDir, `${req.params.id}.json`);
     if (!existsSync(historyPath)) {
       return res.status(404).json({ error: 'History not found' });

@@ -65,7 +65,7 @@ Your execution steps for every ticket:
 6. Classify the ticket's category and severity using "classify_ticket".
 7. Draft a response using "draft_response" when appropriate. 
 8. If the information obtained from the ticket is deemed lacking, the response should ask question to gain more insight on the matter and set status to "need clarification"
-9. If the ticket description is comedic, or not serious, draft the response to warn the user and immediatly set it status to resolved
+9. If the ticket description is comedic or not serious, draft a warning response and use the "resolved" outcome. Call "delete_resolved_ticket" with the current ticket ID before "idle"; deletion will occur only after the ticket is successfully finalized as resolved.
 10. Finally use "route_ticket" for the operational destination.
 11. Once your work is complete, you must call the "idle" tool specifying the correct "resolution_type" and "reason" to finish.
 

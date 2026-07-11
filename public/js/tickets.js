@@ -2,6 +2,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const container = document.getElementById('tickets-container');
   const tabOpen = document.getElementById('tab-open');
   const tabClosed = document.getElementById('tab-closed');
+  const ticketFlash = document.getElementById('ticket-flash');
+
+  const deletedTicketId = new URLSearchParams(window.location.search).get('deleted');
+  if (deletedTicketId) {
+    ticketFlash.textContent = `Resolved ticket ${deletedTicketId} was permanently deleted.`;
+    ticketFlash.className = 'flash flash-success';
+    ticketFlash.style.display = 'block';
+    window.history.replaceState({}, '', '/tickets.html');
+  }
 
   let openTickets = [];
   let closedTickets = [];
