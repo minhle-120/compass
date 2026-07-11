@@ -4,7 +4,10 @@ dotenv.config();
 export const config = {
   // Server & Queue Database Configuration
   port: parseInt(process.env.PORT || '3000', 10),
-  dbPath: process.env.DB_PATH || './database.sqlite',
+  get dbPath() {
+    return process.env.DB_PATH || './database.sqlite';
+  },
+
   concurrencyCap: 5,
   pollIntervalMs: 3000,
 
