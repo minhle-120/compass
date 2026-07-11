@@ -176,6 +176,11 @@ npm run wiki:catalog
 
 Entries changed in the local editor are marked as local and are not overwritten by later source refreshes.
 
+### Reviewing unknown words
+When both `query_slang_dictionary` and `search_knowledge_base` return no result for the same exact word, the agent can call `flag_unknown_word`. Repeated sightings are grouped by normalized word and retain the latest ticket context.
+
+Open `http://localhost:3000/flags` to review the queue. Developers can search flags, follow the latest ticket, and mark words open, resolved, or ignored. Creating a wiki entry with the same term automatically resolves its open flag.
+
 ### Extending with new tools
 To create a new tool, create `src/tools/{tool_name}.js` with this structure:
 ```javascript

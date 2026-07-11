@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 process.env.DB_PATH = ':memory:';
+process.env.WIKI_DB_PATH = ':memory:';
 
 const { executeTool, getOpenAITools } = await import('../registry.js');
 const { getDb, insertTicket } = await import('../../database/sqlite.js');
@@ -25,6 +26,7 @@ describe('tool registry outcomes', () => {
     expect(new Set(names).size).toBe(names.length);
     expect(names).toContain('idle');
     expect(names).toContain('read_ticket');
+    expect(names).toContain('flag_unknown_word');
   });
 
   it('does not mark a workflow step complete when its handler fails', async () => {
@@ -89,5 +91,26 @@ describe('tool registry outcomes', () => {
   it('rejects unknown tool names', async () => {
     await expect(executeTool('missing_tool', {}, createSessionContext()))
       .rejects.toThrow('is not registered');
+  });
+
+  it('requires both exact-word misses before flagging an unknown word', async () => {
+    const context = createSessionContext();
+    const blocked = await executeTool('flag_unknown_word', {
+      word: 'glorp',
+      context: 'That was glorp.'
+    }, context);
+    expect(blocked).toMatchObject({ ok: false, error: { code: 'LOOKUP_REQUIRED' } });
+
+    context.unknownWordChecks = {
+      glorp: { slangMiss: true, knowledgeMiss: true }
+    };
+    const flagged = await executeTool('flag_unknown_word', {
+      word: 'glorp',
+      context: 'That was glorp.'
+    }, context);
+    expect(flagged).toMatchObject({
+      ok: true,
+      output: { flagged: true, word: 'glorp', occurrence_count: 1 }
+    });
   });
 });

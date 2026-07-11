@@ -44,6 +44,20 @@ export function initWikiDb() {
       updated_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS unknown_words (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      word TEXT NOT NULL,
+      normalized_word TEXT NOT NULL UNIQUE,
+      context TEXT,
+      reason TEXT,
+      latest_ticket_id TEXT,
+      occurrence_count INTEGER NOT NULL DEFAULT 1,
+      status TEXT NOT NULL CHECK(status IN ('open', 'resolved', 'ignored')) DEFAULT 'open',
+      first_seen_at TEXT NOT NULL,
+      last_seen_at TEXT NOT NULL,
+      resolved_at TEXT
+    );
+
   `);
 
   const columns = db.prepare('PRAGMA table_info(wiki_entries)').all();
@@ -53,6 +67,7 @@ export function initWikiDb() {
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_wiki_entries_term ON wiki_entries(term COLLATE NOCASE);
     CREATE INDEX IF NOT EXISTS idx_wiki_entries_category ON wiki_entries(category);
+    CREATE INDEX IF NOT EXISTS idx_unknown_words_status ON unknown_words(status, last_seen_at DESC);
   `);
 
   seedWikiIfEmpty(db);
@@ -117,6 +132,8 @@ export function createWikiEntry(input) {
     VALUES (?, ?, ?, 'manual', ?, ?)
   `).run(entry.term, entry.explanation, entry.category, now, now);
 
+  resolveUnknownWordByTerm(database, entry.term, now);
+
   return getWikiEntry(result.lastInsertRowid);
 }
 
@@ -131,6 +148,8 @@ export function updateWikiEntry(id, input) {
     WHERE id = ?
   `).run(entry.term, entry.explanation, entry.category, new Date().toISOString(), numericId);
 
+  if (result.changes) resolveUnknownWordByTerm(initWikiDb(), entry.term, new Date().toISOString());
+
   return result.changes ? getWikiEntry(numericId) : null;
 }
 
@@ -138,6 +157,94 @@ export function deleteWikiEntry(id) {
   const numericId = parseId(id);
   if (!numericId) return false;
   return initWikiDb().prepare('DELETE FROM wiki_entries WHERE id = ?').run(numericId).changes > 0;
+}
+
+export function flagUnknownWord(input) {
+  const word = String(input?.word || '').trim();
+  const normalizedWord = normalizeUnknownWord(word);
+  const context = optionalText(input?.context, 1000);
+  const reason = optionalText(input?.reason, 500);
+  const ticketId = optionalText(input?.ticketId, 160);
+  if (!normalizedWord) throw new WikiValidationError('Unknown word is required.');
+  if (word.length > 160) throw new WikiValidationError('Unknown word must be 160 characters or fewer.');
+
+  const database = initWikiDb();
+  const now = new Date().toISOString();
+  database.prepare(`
+    INSERT INTO unknown_words (
+      word, normalized_word, context, reason, latest_ticket_id,
+      occurrence_count, status, first_seen_at, last_seen_at, resolved_at
+    ) VALUES (?, ?, ?, ?, ?, 1, 'open', ?, ?, NULL)
+    ON CONFLICT(normalized_word) DO UPDATE SET
+      context = COALESCE(excluded.context, unknown_words.context),
+      reason = COALESCE(excluded.reason, unknown_words.reason),
+      latest_ticket_id = COALESCE(excluded.latest_ticket_id, unknown_words.latest_ticket_id),
+      occurrence_count = unknown_words.occurrence_count + 1,
+      status = CASE WHEN unknown_words.status = 'resolved' THEN 'open' ELSE unknown_words.status END,
+      last_seen_at = excluded.last_seen_at,
+      resolved_at = CASE WHEN unknown_words.status = 'resolved' THEN NULL ELSE unknown_words.resolved_at END
+  `).run(word, normalizedWord, context, reason, ticketId, now, now);
+
+  return database.prepare('SELECT * FROM unknown_words WHERE normalized_word = ?').get(normalizedWord);
+}
+
+export function listUnknownWords({ query = '', status = 'open', limit = 100, offset = 0 } = {}) {
+  const database = initWikiDb();
+  const normalizedQuery = normalizeUnknownWord(query);
+  const safeStatus = ['open', 'resolved', 'ignored', 'all'].includes(status) ? status : 'open';
+  const safeLimit = clampInteger(limit, 1, 500, 100);
+  const safeOffset = clampInteger(offset, 0, Number.MAX_SAFE_INTEGER, 0);
+  const clauses = [];
+  const params = {};
+
+  if (safeStatus !== 'all') {
+    clauses.push('status = @status');
+    params.status = safeStatus;
+  }
+  if (normalizedQuery) {
+    clauses.push('(normalized_word LIKE @query OR context LIKE @query OR latest_ticket_id LIKE @query)');
+    params.query = `%${normalizedQuery}%`;
+  }
+
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  const countStatement = database.prepare(`SELECT COUNT(*) AS count FROM unknown_words ${where}`);
+  const total = (Object.keys(params).length ? countStatement.get(params) : countStatement.get()).count;
+  const entries = database.prepare(`
+    SELECT * FROM unknown_words
+    ${where}
+    ORDER BY last_seen_at DESC, id DESC
+    LIMIT @limit OFFSET @offset
+  `).all({ ...params, limit: safeLimit, offset: safeOffset });
+
+  return { query: String(query || '').trim(), status: safeStatus, total, entries };
+}
+
+export function updateUnknownWordStatus(id, status) {
+  const numericId = parseId(id);
+  if (!numericId) return null;
+  if (!['open', 'resolved', 'ignored'].includes(status)) {
+    throw new WikiValidationError('Status must be open, resolved, or ignored.');
+  }
+
+  const now = new Date().toISOString();
+  const result = initWikiDb().prepare(`
+    UPDATE unknown_words
+    SET status = ?, resolved_at = CASE WHEN ? = 'resolved' THEN ? ELSE NULL END
+    WHERE id = ?
+  `).run(status, status, now, numericId);
+  return result.changes ? getUnknownWord(numericId) : null;
+}
+
+export function deleteUnknownWord(id) {
+  const numericId = parseId(id);
+  if (!numericId) return false;
+  return initWikiDb().prepare('DELETE FROM unknown_words WHERE id = ?').run(numericId).changes > 0;
+}
+
+export function getUnknownWord(id) {
+  const numericId = parseId(id);
+  if (!numericId) return null;
+  return initWikiDb().prepare('SELECT * FROM unknown_words WHERE id = ?').get(numericId) || null;
 }
 
 export function importWikiEntries(entries) {
@@ -169,11 +276,13 @@ export function importWikiEntries(entries) {
       const now = new Date().toISOString();
       if (!existing) {
         insert.run(entry.term, entry.explanation, entry.category, now, now);
+        resolveUnknownWordByTerm(database, entry.term, now);
         result.added += 1;
       } else if (existing.origin === 'manual') {
         result.preserved += 1;
       } else if (existing.explanation !== entry.explanation || existing.category !== entry.category) {
         update.run(entry.explanation, entry.category, now, existing.id);
+        resolveUnknownWordByTerm(database, entry.term, now);
         result.updated += 1;
       } else {
         result.preserved += 1;
@@ -230,6 +339,7 @@ export function getWikiStats() {
   `).get();
 
   const categoryRows = database.prepare('SELECT category, COUNT(*) AS count FROM wiki_entries GROUP BY category').all();
+  const unknownRows = database.prepare('SELECT status, COUNT(*) AS count FROM unknown_words GROUP BY status').all();
   return {
     total: row.total || 0,
     manual: row.manual || 0,
@@ -238,6 +348,10 @@ export function getWikiStats() {
     categories: Object.fromEntries(WIKI_CATEGORIES.map((category) => [
       category,
       categoryRows.find((item) => item.category === category)?.count || 0
+    ])),
+    unknown_words: Object.fromEntries(['open', 'resolved', 'ignored'].map((status) => [
+      status,
+      unknownRows.find((item) => item.status === status)?.count || 0
     ]))
   };
 }
@@ -271,6 +385,28 @@ function validateEntry(input) {
   if (explanation.length > 10000) throw new WikiValidationError('Explanation must be 10,000 characters or fewer.');
 
   return { term, explanation, category };
+}
+
+function resolveUnknownWordByTerm(database, term, now) {
+  database.prepare(`
+    UPDATE unknown_words
+    SET status = 'resolved', resolved_at = ?
+    WHERE normalized_word = ? AND status != 'resolved'
+  `).run(now, normalizeUnknownWord(term));
+}
+
+function normalizeUnknownWord(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^[-'"`.,!?;:()[\]{}]+|[-'"`.,!?;:()[\]{}]+$/g, '')
+    .replace(/\s+/g, ' ');
+}
+
+function optionalText(value, maxLength) {
+  const text = String(value || '').trim();
+  if (!text) return null;
+  return text.slice(0, maxLength);
 }
 
 function deduplicateEntries(entries) {

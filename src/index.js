@@ -17,8 +17,11 @@ import {
   deleteWikiEntry,
   getWikiEntry,
   getWikiStats,
+  deleteUnknownWord,
+  listUnknownWords,
   initWikiDb,
   listWikiEntries,
+  updateUnknownWordStatus,
   updateWikiEntry
 } from '../services/wiki/wikiService.js';
 import { startWikiSync } from '../services/wiki/sync.js';
@@ -45,6 +48,10 @@ app.get('/wiki', (req, res) => {
   res.sendFile(join(__dirname, '../public/wiki.html'));
 });
 
+app.get('/flags', (req, res) => {
+  res.sendFile(join(__dirname, '../public/flags.html'));
+});
+
 app.get('/api/wiki', (req, res) => {
   try {
     res.json(listWikiEntries({
@@ -63,6 +70,40 @@ app.get('/api/wiki/stats', (req, res) => {
     res.json(getWikiStats());
   } catch (error) {
     sendWikiError(res, error, 'retrieve wiki statistics');
+  }
+});
+
+app.get('/api/wiki/flags', (req, res) => {
+  try {
+    res.json(listUnknownWords({
+      query: req.query.query || '',
+      status: req.query.status || 'open',
+      limit: req.query.limit,
+      offset: req.query.offset
+    }));
+  } catch (error) {
+    sendWikiError(res, error, 'list flagged words');
+  }
+});
+
+app.patch('/api/wiki/flags/:id', (req, res) => {
+  try {
+    const entry = updateUnknownWordStatus(req.params.id, req.body?.status);
+    if (!entry) return res.status(404).json({ error: 'Flagged word not found.' });
+    res.json(entry);
+  } catch (error) {
+    sendWikiError(res, error, 'update flagged word');
+  }
+});
+
+app.delete('/api/wiki/flags/:id', (req, res) => {
+  try {
+    if (!deleteUnknownWord(req.params.id)) {
+      return res.status(404).json({ error: 'Flagged word not found.' });
+    }
+    res.status(204).end();
+  } catch (error) {
+    sendWikiError(res, error, 'delete flagged word');
   }
 });
 

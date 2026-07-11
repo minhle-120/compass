@@ -437,6 +437,31 @@ describe('Agent ReAct Loop', () => {
     expect(sessionContext.flags.wasTicketRead).toBe(true);
   });
 
+  it('should reconstruct unknown-word lookup misses from persisted tool results', async () => {
+    writeFileSync(historyFilePath, JSON.stringify([
+      { role: 'system', content: config.systemPrompt },
+      { role: 'user', content: 'Start' },
+      { role: 'assistant', tool_calls: [{ id: 'call_slang', type: 'function', function: { name: 'query_slang_dictionary', arguments: '{"term":"glorp"}' } }] },
+      { role: 'tool', tool_call_id: 'call_slang', name: 'query_slang_dictionary', content: JSON.stringify({ ok: true, output: 'No slang definition found for "glorp".' }) },
+      { role: 'assistant', tool_calls: [{ id: 'call_knowledge', type: 'function', function: { name: 'search_knowledge_base', arguments: '{"query":"glorp"}' } }] },
+      { role: 'tool', tool_call_id: 'call_knowledge', name: 'search_knowledge_base', content: JSON.stringify({ ok: true, output: { query: 'glorp', total_matches: 0, results: [] } }) }
+    ], null, 2));
+    axios.post.mockResolvedValueOnce({
+      data: {
+        choices: [{ message: { role: 'assistant', tool_calls: [{
+          id: 'call_idle_unknown', type: 'function', function: { name: 'idle', arguments: '{"resolution_type":"rejected","reason":"Done"}' }
+        }] } }],
+        usage: { total_tokens: 50 }
+      }
+    });
+    executeTool.mockImplementationOnce(async () => {
+      expect(sessionContext.unknownWordChecks.glorp).toEqual({ slangMiss: true, knowledgeMiss: true });
+      return '# Agent idling';
+    });
+
+    await runAgentLoop(sessionContext);
+  });
+
   it('should append one wake-up marker for the current workflow revision', async () => {
     sessionContext.workflowRevision = 3;
     writeFileSync(historyFilePath, JSON.stringify([

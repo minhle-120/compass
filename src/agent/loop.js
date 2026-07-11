@@ -86,11 +86,48 @@ function reconstructWorkflowFlags(messages, sessionContext) {
     message.role === 'user' && message.content?.includes('player has sent a new update') ? index : lastIndex
   ), -1);
 
+  const toolCalls = new Map();
+  sessionContext.unknownWordChecks ||= {};
+
   for (const message of messages.slice(wakeIndex + 1)) {
+    if (message.role === 'assistant' && Array.isArray(message.tool_calls)) {
+      for (const call of message.tool_calls) {
+        let args = {};
+        try { args = JSON.parse(call.function?.arguments || '{}'); } catch {}
+        toolCalls.set(call.id, { name: call.function?.name, args });
+      }
+      continue;
+    }
     if (message.role !== 'tool' || !parseToolResult(message.content).ok) continue;
-    const flag = FLAG_BY_TOOL[message.name];
+    const result = parseToolResult(message.content);
+    const call = toolCalls.get(message.tool_call_id);
+    const toolName = message.name || call?.name;
+    const flag = FLAG_BY_TOOL[toolName];
     if (flag) sessionContext.flags[flag] = true;
+
+    if (toolName === 'query_slang_dictionary') {
+      const key = normalizeUnknownWord(call?.args?.term);
+      if (key) {
+        sessionContext.unknownWordChecks[key] ||= { slangMiss: false, knowledgeMiss: false };
+        sessionContext.unknownWordChecks[key].slangMiss = typeof result.output === 'string'
+          && result.output.startsWith('No slang definition found');
+      }
+    } else if (toolName === 'search_knowledge_base') {
+      const key = normalizeUnknownWord(call?.args?.query);
+      if (key) {
+        sessionContext.unknownWordChecks[key] ||= { slangMiss: false, knowledgeMiss: false };
+        sessionContext.unknownWordChecks[key].knowledgeMiss = result.output?.total_matches === 0;
+      }
+    }
   }
+}
+
+function normalizeUnknownWord(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^[-'"`.,!?;:()[\]{}]+|[-'"`.,!?;:()[\]{}]+$/g, '')
+    .replace(/\s+/g, ' ');
 }
 
 function normalizeToolResult(result, toolName) {

@@ -5,17 +5,24 @@ process.env.WIKI_DB_PATH = ':memory:';
 import {
   createWikiEntry,
   deleteWikiEntry,
+  deleteUnknownWord,
+  flagUnknownWord,
   getWikiEntry,
+  getUnknownWord,
   importWikiEntries,
   initWikiDb,
+  listUnknownWords,
   searchWikiEntries,
+  updateUnknownWordStatus,
   updateWikiEntry
 } from '../wikiService.js';
 import { downloadValorantTerminology, parseTerminologyHtml } from '../importer.js';
 
 describe('Local wiki service', () => {
   beforeEach(() => {
-    initWikiDb().prepare('DELETE FROM wiki_entries').run();
+    const db = initWikiDb();
+    db.prepare('DELETE FROM wiki_entries').run();
+    db.prepare('DELETE FROM unknown_words').run();
   });
 
   it('creates, searches, updates, and deletes an entry', () => {
@@ -76,5 +83,32 @@ describe('Local wiki service', () => {
     expect(result.entries).toHaveLength(20);
     expect(requestedUrls).toHaveLength(1);
     expect(requestedUrls[0]).toContain('/en-us/Terminology');
+  });
+
+  it('groups repeated unknown words and resolves them when a definition is added', () => {
+    const first = flagUnknownWord({
+      word: 'Glorp!',
+      context: 'That enemy is glorp.',
+      reason: 'No dictionary result.',
+      ticketId: 'T-ONE'
+    });
+    const repeated = flagUnknownWord({
+      word: 'glorp',
+      context: 'This weapon feels glorp.',
+      ticketId: 'T-TWO'
+    });
+
+    expect(repeated.id).toBe(first.id);
+    expect(repeated.occurrence_count).toBe(2);
+    expect(repeated.latest_ticket_id).toBe('T-TWO');
+    expect(listUnknownWords({ status: 'open' }).total).toBe(1);
+    expect(listUnknownWords({ status: 'all' }).total).toBe(1);
+
+    expect(updateUnknownWordStatus(first.id, 'ignored').status).toBe('ignored');
+    createWikiEntry({ term: 'Glorp', explanation: 'A newly documented term.', category: 'mechanic' });
+    expect(getUnknownWord(first.id).status).toBe('resolved');
+
+    expect(deleteUnknownWord(first.id)).toBe(true);
+    expect(getUnknownWord(first.id)).toBeNull();
   });
 });

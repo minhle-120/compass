@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Developer review queue for words the support agent could not identify.">
+  <title>Unknown Words | Compass</title>
+  <link rel="stylesheet" href="/css/wiki.css">
+  <link rel="stylesheet" href="/css/flags.css">
+  <script src="/js/theme.js"></script>
+</head>
+<body>
+  <header class="masthead">
+    <a class="masthead-brand" href="/flags" aria-label="Unknown words queue">
+      <span class="brand-mark">C//</span>
+      <span>
+        <strong>Unknown Words</strong>
+        <small>Developer review queue</small>
+      </span>
+    </a>
+    <nav class="masthead-nav" aria-label="Primary navigation">
+      <a href="/wiki">Knowledge wiki</a>
+      <a href="/dashboard.html">Support dashboard</a>
+    </nav>
+  </header>
+
+  <main class="flags-page">
+    <section class="flags-hero">
+      <div>
+        <p class="kicker">Agent feedback / Lexicon gaps</p>
+        <h1>Words we could<br>not explain.</h1>
+      </div>
+      <p>These words were absent from both the Gen-Z slang source and the local game wiki. Repeated sightings are grouped so the most frequent gaps rise naturally.</p>
+    </section>
+
+    <section id="flag-stats" class="flag-stats" aria-live="polite"></section>
+
+    <section class="flag-controls" aria-label="Flag filters">
+      <div>
+        <label for="flag-search">Search flags, context, or ticket</label>
+        <input id="flag-search" type="search" placeholder="Search review queue" autocomplete="off">
+      </div>
+      <div>
+        <label for="flag-status">Status</label>
+        <select id="flag-status">
+          <option value="open">Open</option>
+          <option value="resolved">Resolved</option>
+          <option value="ignored">Ignored</option>
+          <option value="all">All flags</option>
+        </select>
+      </div>
+    </section>
+
+    <section class="flag-ledger">
+      <div class="ledger-heading">
+        <span id="flag-count">Loading queue...</span>
+        <button id="refresh-flags" class="button" type="button">Refresh</button>
+      </div>
+      <div id="flag-list" class="flag-list" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <dialog id="add-word-dialog">
+    <form id="add-word-form" class="dialog-card">
+      <p class="kicker">Promote to knowledge</p>
+      <h2>Add to wiki</h2>
+      <p>Publishing this definition will automatically resolve the flag.</p>
+
+      <label for="add-word-term">Word</label>
+      <input id="add-word-term" type="text" readonly>
+
+      <label for="add-word-category">Category</label>
+      <select id="add-word-category" required>
+        <option value="mechanic" selected>Mechanic</option>
+        <option value="agent">Agent</option>
+        <option value="ability">Ability</option>
+        <option value="ultimate">Ultimate</option>
+        <option value="map">Map</option>
+        <option value="weapon">Weapon</option>
+      </select>
+
+      <label for="add-word-explanation">Explanation</label>
+      <textarea id="add-word-explanation" maxlength="10000" required placeholder="Explain this word in plain language."></textarea>
+
+      <div class="dialog-actions">
+        <button id="cancel-add-word" class="button" type="button">Cancel</button>
+        <button id="publish-add-word" class="button button-accent" type="submit">Add and resolve</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="flag-toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="/js/flags.js" type="module"></script>
+</body>
+</html>
