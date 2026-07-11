@@ -5,6 +5,7 @@ process.env.INCIDENT_DB_PATH = ':memory:';
 const { getIncidentDb } = await import('../db.js');
 const {
   getIncidentDetails,
+  listUnresolvedIncidents,
   searchIncidents,
   upsertIncident
 } = await import('../incidentService.js');
@@ -113,6 +114,18 @@ describe('incident service', () => {
       guidance: 'Ask players not to reset their passwords.',
       approved_message: 'We are investigating login failures.'
     });
+  });
+
+  it('lists unresolved incidents sorted by severity before recency', () => {
+    upsertIncident({
+      ...storeIncident,
+      id: 'INC-003',
+      status: 'monitoring',
+      severity: 'high',
+      updated_at: '2026-07-11T11:00:00.000Z'
+    });
+
+    expect(listUnresolvedIncidents().map((incident) => incident.id)).toEqual(['INC-001', 'INC-003']);
   });
 
   it('returns an explicit not-found result', () => {

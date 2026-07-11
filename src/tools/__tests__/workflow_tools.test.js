@@ -67,7 +67,9 @@ describe('support workflow tools', () => {
     const classification = JSON.parse(await classifyTicket({
       categories: ['bug'],
       severity: 'medium',
-      rationale: 'The game crashes after an update.'
+      rationale: 'The game crashes after an update.',
+      problem_summary: 'Game crashes on Android startup',
+      problem_reason: 'Latest Android update is installed'
     }, context));
 
     expect(classification.severity).toBe('high');

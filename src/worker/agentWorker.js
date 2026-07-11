@@ -26,6 +26,7 @@ async function start() {
     flags: {
       wasTicketRead: false,
       wasAttachmentsInspected: false,
+      wasSameTypeTicketsCompared: false,
       wasClassified: false,
       wasResponseDrafted: false,
       wasIncidentsChecked: false,

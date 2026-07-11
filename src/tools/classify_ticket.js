@@ -28,16 +28,24 @@ export const schema = {
         rationale: {
           type: 'string',
           description: 'Brief explanation for the selected categories and severity.'
+        },
+        problem_summary: {
+          type: 'string',
+          description: 'A concise, normalized statement of what happened. Use the same wording for tickets that have the same exact player-facing problem.'
+        },
+        problem_reason: {
+          type: 'string',
+          description: 'The exact cause, setting, scenario, or trigger behind the problem. Use different wording when the same symptom happens for a different reason.'
         }
       },
-      required: ['categories', 'severity', 'rationale']
+      required: ['categories', 'severity', 'rationale', 'problem_summary', 'problem_reason']
     }
   }
 };
 
 export async function handler(args, sessionContext) {
   const { ticketId } = sessionContext || {};
-  const { categories, severity, rationale } = args || {};
+  const { categories, severity, rationale, problem_summary: problemSummary, problem_reason: problemReason } = args || {};
   if (!ticketId) {
     throw new Error('No ticket ID is available for classification.');
   }
@@ -51,6 +59,12 @@ export async function handler(args, sessionContext) {
   }
   if (typeof rationale !== 'string' || !rationale.trim()) {
     throw new TypeError('rationale must be a non-empty string');
+  }
+  if (typeof problemSummary !== 'string' || !problemSummary.trim()) {
+    throw new TypeError('problem_summary must be a non-empty string');
+  }
+  if (typeof problemReason !== 'string' || !problemReason.trim()) {
+    throw new TypeError('problem_reason must be a non-empty string');
   }
 
   // Severity boosting from matched incident
@@ -66,14 +80,24 @@ export async function handler(args, sessionContext) {
   updateTicketClassification(ticketId, categories, effectiveSeverity, effectiveRationale);
 
   // 2. Perform deduplication clustering (using primary category categories[0])
-  const clustering = clusterTicketIntoProblem(ticketId, categories[0], effectiveSeverity, effectiveRationale);
+  const clustering = clusterTicketIntoProblem(
+    ticketId,
+    categories[0],
+    effectiveSeverity,
+    effectiveRationale,
+    problemSummary,
+    problemReason
+  );
 
   return JSON.stringify({
     ticket_id: ticketId,
     categories,
     severity: effectiveSeverity,
     rationale: effectiveRationale,
+    problem_summary: problemSummary.trim(),
+    problem_reason: problemReason.trim(),
     problem: clustering.problem,
-    problem_action: clustering.action
+    problem_action: clustering.action,
+    incident: clustering.incident
   });
 }

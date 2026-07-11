@@ -4,6 +4,7 @@ import { dirname } from 'path';
 import { mkdirSync } from 'fs';
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
+import { upsertIncident } from '../../services/incident/incidentService.js';
 
 let db;
 
@@ -76,6 +77,10 @@ export function initDb() {
       status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open', 'resolved', 'closed')),
       source TEXT NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
       description_signature TEXT NOT NULL,
+      problem_summary TEXT,
+      problem_reason TEXT,
+      problem_signature TEXT,
+      incident_id TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -92,6 +97,8 @@ export function initDb() {
   `);
 
   migrateTicketSchema(db);
+  migrateProblemSchema(db);
+  promoteEligibleProblemClusters();
 
   const incidentCount = db
     .prepare('SELECT COUNT(*) AS count FROM incident')
@@ -346,6 +353,206 @@ export function failRunningTicket(id, errorMessage) {
   return info.changes === 1;
 }
 
+export function migrateProblemSchema(database) {
+  const tables = new Set(database.prepare(`
+    SELECT name FROM sqlite_master WHERE type = 'table'
+  `).all().map((row) => row.name));
+  if (!tables.has('problems')) return;
+
+  const columns = new Set(database.prepare('PRAGMA table_info(problems)').all().map((column) => column.name));
+  const migrations = [
+    ['problem_summary', 'TEXT'],
+    ['problem_reason', 'TEXT'],
+    ['problem_signature', 'TEXT'],
+    ['incident_id', 'TEXT']
+  ];
+
+  for (const [name, definition] of migrations) {
+    if (!columns.has(name)) database.exec(`ALTER TABLE problems ADD COLUMN ${name} ${definition}`);
+  }
+
+  const rowsNeedingSignature = database.prepare(`
+    SELECT id, category, reason, description_signature, problem_summary, problem_reason
+    FROM problems
+    WHERE problem_signature IS NULL OR trim(problem_signature) = ''
+  `).all();
+
+  const updateProblemSignature = database.prepare(`
+    UPDATE problems
+    SET problem_summary = ?, problem_reason = ?, problem_signature = ?
+    WHERE id = ?
+  `);
+
+  for (const row of rowsNeedingSignature) {
+    const summary = compactProblemText(row.problem_summary || row.description_signature || row.reason);
+    const reason = compactProblemText(row.problem_reason || row.reason);
+    updateProblemSignature.run(
+      summary,
+      reason,
+      buildProblemSignature(row.category, summary, reason),
+      row.id
+    );
+  }
+
+  reconcileOpenProblemClusters(database);
+
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_problems_open_problem_signature
+      ON problems(status, category, problem_signature);
+
+    CREATE INDEX IF NOT EXISTS idx_problems_incident_id
+      ON problems(incident_id);
+  `);
+}
+
+function severityValue(severity) {
+  return { low: 0, medium: 1, high: 2, critical: 3 }[severity] ?? 0;
+}
+
+function reconcileOpenProblemClusters(database) {
+  const tables = new Set(database.prepare(`
+    SELECT name FROM sqlite_master WHERE type = 'table'
+  `).all().map((row) => row.name));
+  if (!tables.has('problem_tickets')) return;
+
+  const rows = database.prepare(`
+    SELECT id, category, severity, reason, description_signature, problem_summary,
+           problem_reason, problem_signature, incident_id, created_at, updated_at
+    FROM problems
+    WHERE status = 'open'
+    ORDER BY created_at ASC, id ASC
+  `).all();
+
+  const updateProblem = database.prepare(`
+    UPDATE problems
+    SET problem_summary = ?, problem_reason = ?, problem_signature = ?
+    WHERE id = ?
+  `);
+
+  for (const row of rows) {
+    const summary = compactProblemText(row.problem_summary || row.description_signature || row.reason);
+    const reason = compactProblemText(row.problem_reason || row.reason);
+    const signature = buildProblemSignature(row.category, summary, reason);
+    const originalSignature = row.problem_signature;
+    row.problem_summary = summary;
+    row.problem_reason = reason;
+    row.problem_signature = signature;
+    if (signature !== originalSignature) {
+      updateProblem.run(summary, reason, signature, row.id);
+    }
+  }
+
+  repairUnlinkedClassifiedTickets(database);
+
+  const groups = rows.reduce((acc, row) => {
+    const key = `${row.category.toLowerCase()}|${row.problem_signature}`;
+    acc[key] ||= [];
+    acc[key].push(row);
+    return acc;
+  }, {});
+
+  const moveTickets = database.prepare('UPDATE problem_tickets SET problem_id = ? WHERE problem_id = ?');
+  const deleteProblem = database.prepare('DELETE FROM problems WHERE id = ?');
+  const updatePrimary = database.prepare(`
+    UPDATE problems
+    SET severity = ?, incident_id = COALESCE(incident_id, ?), updated_at = ?
+    WHERE id = ?
+  `);
+
+  for (const group of Object.values(groups)) {
+    if (group.length < 2) continue;
+    const primary = group[0];
+    const strongestSeverity = group.reduce((best, row) => (
+      severityValue(row.severity) > severityValue(best) ? row.severity : best
+    ), primary.severity);
+    const incidentId = group.find((row) => row.incident_id)?.incident_id || null;
+    const updatedAt = group.map((row) => row.updated_at).sort().at(-1) || new Date().toISOString();
+
+    for (const duplicate of group.slice(1)) {
+      moveTickets.run(primary.id, duplicate.id);
+      deleteProblem.run(duplicate.id);
+    }
+    updatePrimary.run(strongestSeverity, incidentId, updatedAt, primary.id);
+  }
+}
+
+function parseStoredCategories(value) {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
+function repairUnlinkedClassifiedTickets(database) {
+  const rows = database.prepare(`
+    SELECT t.id, t.categories, t.severity, t.rationale, t.description, t.created_at
+    FROM tickets t
+    LEFT JOIN problem_tickets pt ON pt.ticket_id = t.id
+    WHERE pt.ticket_id IS NULL
+      AND t.categories IS NOT NULL
+      AND ${openTicketStatusWhere}
+    ORDER BY t.created_at ASC, t.id ASC
+  `).all();
+  if (rows.length === 0) return;
+
+  const findProblem = database.prepare(`
+    SELECT id, severity
+    FROM problems
+    WHERE status = 'open' AND lower(category) = lower(?) AND problem_signature = ?
+    ORDER BY created_at ASC, id ASC
+    LIMIT 1
+  `);
+  const insertProblem = database.prepare(`
+    INSERT INTO problems (
+      category, severity, reason, status, source, description_signature,
+      problem_summary, problem_reason, problem_signature, created_at, updated_at
+    ) VALUES (?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const linkTicket = database.prepare(`
+    INSERT OR IGNORE INTO problem_tickets (problem_id, ticket_id, linked_at)
+    VALUES (?, ?, ?)
+  `);
+  const updateSeverity = database.prepare(`
+    UPDATE problems
+    SET severity = ?, updated_at = ?
+    WHERE id = ?
+  `);
+
+  for (const row of rows) {
+    const category = parseStoredCategories(row.categories)[0];
+    if (!category) continue;
+    const summary = compactProblemText(row.description);
+    const reason = compactProblemText(row.rationale || row.description);
+    if (!summary || !reason) continue;
+
+    const signature = buildProblemSignature(category, summary, reason);
+    const existing = findProblem.get(category, signature);
+    const now = new Date().toISOString();
+    let problemId = existing?.id;
+    if (!problemId) {
+      const result = insertProblem.run(
+        category,
+        row.severity || 'medium',
+        reason,
+        row.id,
+        normalizeProblemPart(row.description),
+        summary,
+        reason,
+        signature,
+        row.created_at || now,
+        now
+      );
+      problemId = Number(result.lastInsertRowid);
+    } else if (severityValue(row.severity) > severityValue(existing.severity)) {
+      updateSeverity.run(row.severity, now, problemId);
+    }
+    linkTicket.run(problemId, row.id, now);
+  }
+}
+
 export function closeTicketByUser(id) {
   const now = new Date().toISOString();
   const info = getDb().prepare(`
@@ -416,38 +623,328 @@ export function getQueueStats() {
   return stats;
 }
 
-export function clusterTicketIntoProblem(ticketId, category, severity, reason) {
+const severityIncidentThresholds = {
+  critical: 3,
+  high: 5,
+  medium: 10,
+  low: 15
+};
+
+const staleIncidentWindowMs = 48 * 60 * 60 * 1000;
+
+const openTicketStatusWhere = `
+  (
+    t.status IN ('pending', 'running', 'escalated', 'failed')
+    OR (
+      t.status = 'completed'
+      AND (
+        t.resolution_type = 'needs_clarification'
+        OR t.draft_status = 'pending_review'
+      )
+    )
+  )
+`;
+
+function normalizeProblemPart(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/\bcosmic\s+divide\b/g, ' ultimate ')
+    .replace(/\bastral\s+form\b/g, ' ultimate ')
+    .replace(/\bults?\b/g, ' ultimate ')
+    .replace(/\bultimates?\b/g, ' ultimate ')
+    .replace(/\bcrashes?\b/g, ' crash ')
+    .replace(/\b(can'?t|cannot|could\s+not|unable\s+to)\s+move\b/g, ' movement_lock ')
+    .replace(/\b(ummoveable|unmoveable|immovable|stuck|stuck\s+in\s+place)\b/g, ' movement_lock ')
+    .replace(/\bmovement\s+(is|becomes|became)?\s*(blocked|unavailable|locked)\b/g, ' movement_lock ')
+    .replace(/\b(blocked|locked)\b/g, ' movement_lock ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function compactProblemText(value) {
+  return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : '';
+}
+
+const problemSignatureStopWords = new Set([
+  'a', 'an', 'and', 'after', 'all', 'also', 'as', 'be', 'because', 'before',
+  'being', 'but', 'by', 'can', 'causes', 'causing', 'character', 'clarified',
+  'core', 'details', 'does', 'during', 'enabled', 'entering', 'enters', 'exact', 'exiting',
+  'for', 'from', 'game', 'gameplay', 'happens', 'has', 'have', 'her', 'his',
+  'i', 'in', 'intended', 'is', 'it', 'latest', 'lacks', 'live', 'map', 'maps',
+  'match', 'mechanic', 'mode', 'newest', 'no', 'not', 'of', 'on', 'or', 'player',
+  'platform', 'provided', 'reproduction', 'reports', 'scenario', 'setting', 'she', 'specific',
+  'state', 'steps', 'that', 'the', 'this', 'ticket', 'to', 'update', 'using',
+  'when', 'whenever', 'whether', 'with',
+  'ability', 'account', 'activating', 'affects', 'are', 'become', 'becomes',
+  'becoming', 'bug', 'context', 'described', 'device', 'directly', 'disrupt',
+  'exists', 'experience', 'fixed', 'form', 'high', 'impact', 'impacts',
+  'incident', 'interrupt', 'investigation', 'issue', 'matching', 'may', 'media',
+  'medium', 'needed', 'needs', 'nor', 'occurs', 'persists', 'place', 'rated',
+  'region', 'seems', 'severity', 'significantly', 'specify', 'startup',
+  'im', 'press', 'stationary', 'though', 'triggered', 'use', 'used', 'user', 'version',
+  'was', 'where', 'wide', 'you'
+]);
+
+function tokenizeProblemPart(part) {
+  return normalizeProblemPart(part).split(/\s+/)
+    .filter((token) => token.length > 2)
+    .filter((token) => !problemSignatureStopWords.has(token));
+}
+
+function canonicalProblemTokens(problemSummary, problemReason) {
+  const summaryTokens = tokenizeProblemPart(problemSummary);
+  const reasonTokens = tokenizeProblemPart(problemReason);
+  const tokens = reasonTokens.length > 8 && summaryTokens.length >= 2
+    ? summaryTokens
+    : [...summaryTokens, ...reasonTokens];
+  return [...new Set(tokens)].sort();
+}
+
+function buildProblemSignature(category, problemSummary, problemReason) {
+  return [
+    normalizeProblemPart(category),
+    canonicalProblemTokens(problemSummary, problemReason).join(' ')
+  ].join('|');
+}
+
+function incidentThresholdFor(category, severity) {
+  const base = severityIncidentThresholds[severity] || severityIncidentThresholds.medium;
+  if (String(category).toLowerCase() === 'payment') return Math.max(base, 10);
+  return base;
+}
+
+function titleFromSummary(summary) {
+  const normalized = normalizeProblemPart(summary);
+  if (normalized.includes('astra') && normalized.includes('ultimate') && normalized.includes('movement') && normalized.includes('lock')) {
+    return 'Astra Ultimate Movement Lock';
+  }
+  if (normalized.includes('ultimate') && normalized.includes('crash')) {
+    return 'Ultimate Activation Crash';
+  }
+  const words = compactProblemText(summary).split(/\s+/).filter(Boolean).slice(0, 8);
+  if (words.length === 0) return 'Repeated Player Issue';
+  return words.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+}
+
+function cleanIncidentReason(problemSummary, problemReason) {
+  const summary = compactProblemText(problemSummary);
+  const reason = compactProblemText(problemReason);
+  const normalized = normalizeProblemPart(`${summary} ${reason}`);
+  if (normalized.includes('astra') && normalized.includes('ultimate') && normalized.includes('movement') && normalized.includes('lock')) {
+    return 'Astra ultimate activation causes the player to become unable to move.';
+  }
+  if (normalized.includes('ultimate') && normalized.includes('crash')) {
+    return 'Ultimate activation triggers a game crash.';
+  }
+  if (tokenizeProblemPart(reason).length > 8 && summary) {
+    return summary;
+  }
+  return reason;
+}
+
+function trimSentenceEnd(value) {
+  return compactProblemText(value).replace(/[.!?]+$/g, '');
+}
+
+function collectProblemTickets(problemId) {
+  return getDb().prepare(`
+    SELECT t.id, t.created_at, t.region, t.platform, t.status, t.resolution_type,
+           t.draft_status, p.category, p.severity, p.problem_summary, p.problem_reason,
+           p.reason, p.incident_id
+    FROM problem_tickets pt
+    JOIN tickets t ON t.id = pt.ticket_id
+    JOIN problems p ON p.id = pt.problem_id
+    WHERE pt.problem_id = ? AND ${openTicketStatusWhere}
+    ORDER BY t.created_at ASC
+  `).all(problemId);
+}
+
+function countValues(rows, field) {
+  return rows.reduce((acc, row) => {
+    const value = compactProblemText(row[field]);
+    if (!value) return acc;
+    acc[value] = (acc[value] || 0) + 1;
+    return acc;
+  }, {});
+}
+
+function rankedValues(counts) {
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([value, count]) => ({ value, count }));
+}
+
+function summarizeIncidentMetadata(rows) {
+  const platformCounts = rankedValues(countValues(rows, 'platform'));
+  const regionCounts = rankedValues(countValues(rows, 'region'));
+  const total = rows.length;
+  const metadataCoverage = rows.filter((row) => row.platform || row.region).length;
+  const platformLeader = platformCounts[0] || null;
+  const regionLeader = regionCounts[0] || null;
+  const metadataParts = [];
+
+  if (platformLeader) {
+    const label = platformLeader.count === total ? 'all reports' : `${platformLeader.count}/${total} reports`;
+    metadataParts.push(`${label} on ${platformLeader.value}`);
+  }
+  if (regionLeader) {
+    const label = regionLeader.count === total ? 'all reports' : `${regionLeader.count}/${total} reports`;
+    metadataParts.push(`${label} in ${regionLeader.value}`);
+  }
+
+  return {
+    platform_counts: platformCounts,
+    region_counts: regionCounts,
+    metadata_coverage: metadataCoverage,
+    metadata_note: metadataParts.length
+      ? `Metadata: ${metadataParts.join('; ')}.`
+      : 'Metadata: no platform or region metadata was provided by the matching tickets.'
+  };
+}
+
+function promoteProblemToIncident(problemId) {
+  const database = getDb();
+  const rows = collectProblemTickets(problemId);
+  if (rows.length === 0) return { promoted: false, reason: 'no_open_tickets' };
+
+  const problem = rows[0];
+  const threshold = incidentThresholdFor(problem.category, problem.severity);
+  if (rows.length < threshold) {
+    return {
+      promoted: false,
+      reason: 'below_threshold',
+      ticket_count: rows.length,
+      required_ticket_count: threshold
+    };
+  }
+
+  const firstCreated = new Date(rows[0].created_at).getTime();
+  const lastCreated = new Date(rows[rows.length - 1].created_at).getTime();
+  const metadata = summarizeIncidentMetadata(rows);
+  if (!Number.isFinite(firstCreated) || !Number.isFinite(lastCreated) || lastCreated - firstCreated > staleIncidentWindowMs) {
+    return {
+      promoted: false,
+      reason: 'stale_ticket_cluster',
+      ticket_count: rows.length,
+      required_ticket_count: threshold,
+      metadata,
+      stale_after_hours: Math.round(staleIncidentWindowMs / 36e5)
+    };
+  }
+
+  const incidentId = problem.incident_id || `INC-AUTO-${String(problemId).padStart(4, '0')}`;
+  const platforms = [...new Set(rows.map((row) => row.platform).filter(Boolean))];
+  const regions = [...new Set(rows.map((row) => row.region).filter(Boolean))];
+  const whatHappened = compactProblemText(problem.problem_summary || problem.reason);
+  const reason = cleanIncidentReason(whatHappened, problem.problem_reason || problem.reason);
+  const summary = `${trimSentenceEnd(whatHappened)}. Reason/scenario: ${trimSentenceEnd(reason)}. ${rows.length} open tickets match this exact problem and reason. ${metadata.metadata_note}`;
+  const now = new Date().toISOString();
+
+  const incident = upsertIncident({
+    id: incidentId,
+    title: titleFromSummary(whatHappened),
+    status: 'active',
+    severity: problem.severity,
+    started_at: rows[0].created_at,
+    updated_at: now,
+    platforms,
+    regions,
+    services: [problem.category],
+    symptoms: whatHappened,
+    summary,
+    category: problem.category,
+    keywords: [
+      ...new Set([
+        problem.category,
+        ...normalizeProblemPart(whatHappened).split(' '),
+        ...normalizeProblemPart(reason).split(' ')
+      ].filter((word) => word.length > 2))
+    ].slice(0, 12),
+    impact: `${rows.length} open player tickets are reporting this same issue. ${metadata.metadata_note}`,
+    understanding: `Created automatically from matching ticket reports. What happened: ${trimSentenceEnd(whatHappened)}. Reason/scenario: ${trimSentenceEnd(reason)}. ${metadata.metadata_note}`,
+    guidance: 'Review linked tickets before publishing any external player-facing update.',
+    approved_message: `We are investigating reports where ${whatHappened}.`
+  });
+
+  database.prepare(`
+    UPDATE problems
+    SET incident_id = ?, updated_at = ?
+    WHERE id = ?
+  `).run(incidentId, now, problemId);
+
+  return {
+    promoted: true,
+    incident,
+    incident_id: incidentId,
+    ticket_count: rows.length,
+    required_ticket_count: threshold,
+    metadata,
+    stale_after_hours: Math.round(staleIncidentWindowMs / 36e5),
+    ticket_ids: rows.map((row) => row.id)
+  };
+}
+
+function promoteEligibleProblemClusters() {
+  const rows = getDb().prepare(`
+    SELECT id FROM problems
+    WHERE status = 'open'
+    ORDER BY created_at ASC, id ASC
+  `).all();
+
+  for (const row of rows) {
+    try {
+      promoteProblemToIncident(row.id);
+    } catch (error) {
+      logger.warn(`Could not evaluate problem ${row.id} for incident promotion: ${error.message}`, 'SQLite');
+    }
+  }
+}
+
+export function clusterTicketIntoProblem(ticketId, category, severity, reason, problemSummary, problemReason) {
   const database = getDb();
   const ticket = getTicket(ticketId);
   if (!ticket) {
     throw new Error(`Ticket "${ticketId}" not found.`);
   }
 
-  // Ignore casing, punctuation, and repeated whitespace when comparing reports.
+  const normalizedSummary = compactProblemText(problemSummary || ticket.description);
+  const normalizedReason = compactProblemText(problemReason || reason);
+  if (!normalizedSummary) {
+    throw new Error(`Ticket "${ticketId}" needs a problem summary to compare.`);
+  }
+  if (!normalizedReason) {
+    throw new Error(`Ticket "${ticketId}" needs a problem reason to compare.`);
+  }
+
+  // Legacy signature is retained for old records and tests that inspect it.
   const descriptionSignature = String(ticket.description || '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
-  if (!descriptionSignature) {
-    throw new Error(`Ticket "${ticketId}" has no description to compare.`);
-  }
+  const problemSignature = buildProblemSignature(category, normalizedSummary, normalizedReason);
 
   const existingLink = database.prepare(`
-    SELECT p.id, p.category, p.severity, p.reason, p.status, p.source
+    SELECT p.id, p.category, p.severity, p.reason, p.status, p.source,
+           p.problem_summary, p.problem_reason, p.incident_id
     FROM problem_tickets pt
     JOIN problems p ON p.id = pt.problem_id
     WHERE pt.ticket_id = ?
   `).get(ticketId);
   if (existingLink) {
-    return { problem: existingLink, action: 'already_linked' };
+    return {
+      problem: existingLink,
+      action: 'already_linked',
+      incident: existingLink.incident_id ? promoteProblemToIncident(existingLink.id) : null
+    };
   }
 
   const matchingProblem = database.prepare(`
-    SELECT id, category, severity, reason, status, source
+    SELECT id, category, severity, reason, status, source,
+           problem_summary, problem_reason, incident_id
     FROM problems
-    WHERE status = 'open' AND category = ? AND description_signature = ?
+    WHERE status = 'open' AND category = ? AND problem_signature = ?
     LIMIT 1
-  `).get(category, descriptionSignature);
+  `).get(category, problemSignature);
 
   const now = new Date().toISOString();
   if (matchingProblem) {
@@ -455,14 +952,27 @@ export function clusterTicketIntoProblem(ticketId, category, severity, reason) {
       INSERT INTO problem_tickets (problem_id, ticket_id, linked_at)
       VALUES (?, ?, ?)
     `).run(matchingProblem.id, ticketId, now);
-    return { problem: matchingProblem, action: 'added_to_pile' };
+    const incident = promoteProblemToIncident(matchingProblem.id);
+    return { problem: matchingProblem, action: 'added_to_pile', incident };
   }
 
   const result = database.prepare(`
     INSERT INTO problems (
-      category, severity, reason, status, source, description_signature, created_at, updated_at
-    ) VALUES (?, ?, ?, 'open', ?, ?, ?, ?)
-  `).run(category, severity, reason, ticketId, descriptionSignature, now, now);
+      category, severity, reason, status, source, description_signature,
+      problem_summary, problem_reason, problem_signature, created_at, updated_at
+    ) VALUES (?, ?, ?, 'open', ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    category,
+    severity,
+    reason,
+    ticketId,
+    descriptionSignature,
+    normalizedSummary,
+    normalizedReason,
+    problemSignature,
+    now,
+    now
+  );
 
   const problem = {
     id: Number(result.lastInsertRowid),
@@ -470,13 +980,121 @@ export function clusterTicketIntoProblem(ticketId, category, severity, reason) {
     severity,
     reason,
     status: 'open',
-    source: ticketId
+    source: ticketId,
+    problem_summary: normalizedSummary,
+    problem_reason: normalizedReason,
+    incident_id: null
   };
   database.prepare(`
     INSERT INTO problem_tickets (problem_id, ticket_id, linked_at)
     VALUES (?, ?, ?)
   `).run(problem.id, ticketId, now);
-  return { problem, action: 'created_problem' };
+  const incident = promoteProblemToIncident(problem.id);
+  return { problem, action: 'created_problem', incident };
+}
+
+export function getIncidentTicketSummary(incidentIds = []) {
+  const ids = Array.isArray(incidentIds) ? incidentIds.filter(Boolean) : [];
+  if (ids.length === 0) return {};
+  const placeholders = ids.map(() => '?').join(', ');
+  const rows = getDb().prepare(`
+    SELECT p.incident_id, pt.ticket_id, t.created_at, t.status
+    FROM problems p
+    JOIN problem_tickets pt ON pt.problem_id = p.id
+    JOIN tickets t ON t.id = pt.ticket_id
+    WHERE p.incident_id IN (${placeholders})
+    ORDER BY t.created_at ASC
+  `).all(...ids);
+
+  return rows.reduce((acc, row) => {
+    if (!acc[row.incident_id]) {
+      acc[row.incident_id] = { ticket_count: 0, ticket_ids: [], latest_created_at: null };
+    }
+    acc[row.incident_id].ticket_count += 1;
+    acc[row.incident_id].ticket_ids.push(row.ticket_id);
+    acc[row.incident_id].latest_created_at = row.created_at;
+    return acc;
+  }, {});
+}
+
+export function compareSameTypeTicketProblems(ticketId, category, problemSummary, problemReason, { limit = 8 } = {}) {
+  const database = getDb();
+  const ticket = getTicket(ticketId);
+  if (!ticket) throw new Error(`Ticket "${ticketId}" not found.`);
+
+  const normalizedCategory = compactProblemText(category).toLowerCase();
+  const normalizedSummary = compactProblemText(problemSummary);
+  const normalizedReason = compactProblemText(problemReason);
+  if (!normalizedCategory) throw new TypeError('category must be a non-empty string');
+  if (!normalizedSummary) throw new TypeError('problem_summary must be a non-empty string');
+  if (!normalizedReason) throw new TypeError('problem_reason must be a non-empty string');
+
+  const problemSignature = buildProblemSignature(normalizedCategory, normalizedSummary, normalizedReason);
+  const safeLimit = Math.min(Math.max(Number.parseInt(limit, 10) || 8, 1), 25);
+  const rows = database.prepare(`
+    SELECT p.id, p.category, p.severity, p.reason, p.problem_summary,
+           p.problem_reason, p.problem_signature, p.incident_id,
+           COUNT(pt.ticket_id) AS ticket_count,
+           MIN(t.created_at) AS first_seen_at,
+           MAX(t.created_at) AS last_seen_at
+    FROM problems p
+    JOIN problem_tickets pt ON pt.problem_id = p.id
+    JOIN tickets t ON t.id = pt.ticket_id
+    WHERE p.status = 'open'
+      AND lower(p.category) = lower(?)
+      AND pt.ticket_id <> ?
+      AND ${openTicketStatusWhere}
+    GROUP BY p.id
+    ORDER BY
+      CASE WHEN p.problem_signature = ? THEN 0 ELSE 1 END,
+      ticket_count DESC,
+      last_seen_at DESC
+    LIMIT ?
+  `).all(normalizedCategory, ticketId, problemSignature, safeLimit);
+
+  const ticketRows = rows.length
+    ? database.prepare(`
+      SELECT pt.problem_id, pt.ticket_id, t.subject, t.created_at, t.severity
+      FROM problem_tickets pt
+      JOIN tickets t ON t.id = pt.ticket_id
+      WHERE pt.problem_id IN (${rows.map(() => '?').join(', ')})
+      ORDER BY t.created_at ASC
+    `).all(...rows.map((row) => row.id))
+    : [];
+
+  const ticketsByProblem = ticketRows.reduce((acc, row) => {
+    acc[row.problem_id] ||= [];
+    acc[row.problem_id].push({
+      id: row.ticket_id,
+      subject: row.subject,
+      created_at: row.created_at,
+      severity: row.severity
+    });
+    return acc;
+  }, {});
+
+  const clusters = rows.map((row) => ({
+    id: row.id,
+    category: row.category,
+    severity: row.severity,
+    problem_summary: row.problem_summary || row.reason,
+    problem_reason: row.problem_reason || row.reason,
+    incident_id: row.incident_id || null,
+    exact_match: row.problem_signature === problemSignature,
+    ticket_count: row.ticket_count,
+    first_seen_at: row.first_seen_at,
+    last_seen_at: row.last_seen_at,
+    tickets: ticketsByProblem[row.id] || []
+  }));
+
+  return {
+    ticket_id: ticketId,
+    category: normalizedCategory,
+    problem_summary: normalizedSummary,
+    problem_reason: normalizedReason,
+    exact_match: clusters.find((cluster) => cluster.exact_match) || null,
+    clusters
+  };
 }
 
 function parseConversation(value) {

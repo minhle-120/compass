@@ -12,6 +12,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const providerLabel = document.getElementById('provider-label');
   const agentCount = document.getElementById('agent-count');
   const agentsContainer = document.getElementById('agents-container');
+  const incidentCount = document.getElementById('incident-count');
+  const incidentsContainer = document.getElementById('incidents-container');
   const ticketTbody = document.getElementById('ticket-tbody');
   const detailOverlay = document.getElementById('detail-overlay');
   const detailTitle = document.getElementById('detail-title');
@@ -71,6 +73,11 @@ document.addEventListener('DOMContentLoaded', () => {
     return str.length > len ? str.slice(0, len) + '…' : str;
   }
 
+  function severityLabel(severity) {
+    const s = (severity || 'medium').toLowerCase();
+    return `<span class="label label-severity-${s}">${esc(s)}</span>`;
+  }
+
   // Fetch management layer status
   async function fetchSystemStatus() {
     try {
@@ -95,7 +102,7 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         agentsContainer.innerHTML = agents.map(a => {
           const checklist = a.checklist || {};
-          const checkItems = ['read_ticket', 'search_incidents', 'classify_ticket', 'draft_response', 'route_ticket']
+          const checkItems = ['read_ticket', 'search_incidents', 'compare_same_type_tickets', 'classify_ticket', 'draft_response', 'route_ticket']
             .map(key => `<span class="check-item ${checklist[key] ? 'done' : ''}">${checklist[key] ? '✓' : '○'} ${key.replace(/_/g, ' ')}</span>`)
             .join('');
 
@@ -117,6 +124,63 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     } catch (err) {
       console.error('Failed to fetch system status', err);
+    }
+  }
+
+  async function fetchIncidents() {
+    try {
+      const res = await fetch('/api/incidents/open');
+      const incidents = await res.json();
+
+      incidentCount.textContent = `${incidents.length} open`;
+
+      if (incidents.length === 0) {
+        incidentsContainer.innerHTML = '<div class="empty-state"><h3>No open incidents</h3><p>Incidents will appear here when enough matching tickets cluster together.</p></div>';
+        return;
+      }
+
+      incidentsContainer.innerHTML = `
+        <div class="incident-list">
+          ${incidents.map((incident) => {
+            const ticketIds = Array.isArray(incident.ticket_ids) ? incident.ticket_ids : [];
+            const ticketLinks = ticketIds.slice(0, 8).map((ticketId) =>
+              `<button class="incident-ticket-link" data-id="${esc(ticketId)}" type="button">${esc(ticketId)}</button>`
+            ).join('');
+            const extraTickets = ticketIds.length > 8
+              ? `<span class="text-muted text-sm">+${ticketIds.length - 8} more</span>`
+              : '';
+
+            return `
+              <article class="incident-card">
+                <div class="incident-card-main">
+                  <div class="incident-card-header">
+                    <span class="incident-id">${esc(incident.id)}</span>
+                    ${severityLabel(incident.severity)}
+                    ${statusLabel(incident.status)}
+                  </div>
+                  <h3>${esc(incident.title || 'Untitled incident')}</h3>
+                  <p>${esc(incident.summary || incident.symptoms || 'No summary available.')}</p>
+                  <div class="incident-meta">
+                    <span>${esc(incident.category || 'uncategorized')}</span>
+                    <span>${incident.ticket_count || 0} linked tickets</span>
+                    <span>Updated ${timeAgo(incident.updated_at)}</span>
+                  </div>
+                </div>
+                <div class="incident-ticket-list">
+                  ${ticketLinks || '<span class="text-muted text-sm">No linked tickets yet</span>'}
+                  ${extraTickets}
+                </div>
+              </article>
+            `;
+          }).join('')}
+        </div>
+      `;
+
+      incidentsContainer.querySelectorAll('.incident-ticket-link').forEach((button) => {
+        button.addEventListener('click', () => openDetail(button.dataset.id));
+      });
+    } catch (err) {
+      console.error('Failed to fetch incidents', err);
     }
   }
 
@@ -281,9 +345,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Initial fetch + polling
   fetchSystemStatus();
+  fetchIncidents();
   fetchTickets();
   setInterval(() => {
     fetchSystemStatus();
+    fetchIncidents();
     fetchTickets();
     if (activeDetailTicketId) {
       refreshDetail(activeDetailTicketId);

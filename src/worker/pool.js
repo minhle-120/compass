@@ -128,6 +128,7 @@ class WorkerPool {
         wasTicketRead: false,
         wasAttachmentsInspected: false,
         wasIncidentsChecked: false,
+        wasSameTypeTicketsCompared: false,
         wasClassified: false,
         wasResponseDrafted: false,
         wasRouted: false

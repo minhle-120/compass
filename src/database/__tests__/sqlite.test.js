@@ -20,7 +20,8 @@ import {
   appendTicketMessage,
   publishDraftResponse,
   closeTicketByUser,
-  migrateTicketSchema
+  migrateTicketSchema,
+  migrateProblemSchema
 } from '../sqlite.js';
 
 
@@ -241,6 +242,45 @@ describe('SQLite Database Queue Layer', () => {
     expect(columns).toEqual(expect.arrayContaining([
       'resolution_type', 'resolution_reason', 'workflow_revision', 'draft_status'
     ]));
+    legacyDb.close();
+  });
+
+  it('should migrate incident problem clustering columns before indexing them', () => {
+    const legacyDb = new Database(':memory:');
+    legacyDb.exec(`
+      CREATE TABLE problems (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        category TEXT NOT NULL,
+        severity TEXT NOT NULL,
+        reason TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'open',
+        source TEXT NOT NULL,
+        description_signature TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      INSERT INTO problems (
+        category, severity, reason, source, description_signature, created_at, updated_at
+      ) VALUES (
+        'bug', 'high', 'Ultra graphics setting is enabled',
+        'T-LEGACY', 'game crashes when starting a match',
+        '2026-07-12T10:00:00.000Z', '2026-07-12T10:00:00.000Z'
+      );
+    `);
+
+    expect(() => migrateProblemSchema(legacyDb)).not.toThrow();
+
+    const row = legacyDb.prepare('SELECT problem_summary, problem_reason, problem_signature FROM problems').get();
+    expect(row).toMatchObject({
+      problem_summary: 'game crashes when starting a match',
+      problem_reason: 'Ultra graphics setting is enabled',
+      problem_signature: 'bug|crash graphics starting ultra'
+    });
+    expect(legacyDb.prepare(`
+      SELECT name FROM sqlite_master
+      WHERE type = 'index' AND name = 'idx_problems_open_problem_signature'
+    `).get()).toBeTruthy();
     legacyDb.close();
   });
 

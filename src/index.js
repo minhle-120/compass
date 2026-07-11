@@ -9,9 +9,10 @@ import { logger } from './utils/logger.js';
 import { isValidTicketId } from './utils/ticketId.js';
 import { normalizeTicketSubmission } from './utils/ticketSubmission.js';
 import { presentTicket } from './utils/ticketPresentation.js';
-import { initDb, resetInterruptedTickets, getTicket, insertTicket, getDb, getQueueStats, appendTicketMessage, publishDraftResponse, closeTicketByUser } from './database/sqlite.js';
+import { initDb, resetInterruptedTickets, getTicket, insertTicket, getDb, getQueueStats, appendTicketMessage, publishDraftResponse, closeTicketByUser, getIncidentTicketSummary } from './database/sqlite.js';
 import { deleteResolvedTicket, TicketDeletionError } from './services/ticketDeletion.js';
 import { pool } from './worker/pool.js';
+import { listUnresolvedIncidents } from '../services/incident/incidentService.js';
 import {
   WikiValidationError,
   createWikiEntry,
@@ -184,6 +185,21 @@ app.get('/api/system/status', (req, res) => {
   } catch (err) {
     logger.error('Failed to retrieve system status', 'ExpressAPI', err);
     res.status(500).json({ error: 'Failed to retrieve system status' });
+  }
+});
+
+app.get('/api/incidents/open', (req, res) => {
+  try {
+    const incidents = listUnresolvedIncidents({ limit: req.query.limit });
+    const ticketSummary = getIncidentTicketSummary(incidents.map((incident) => incident.id));
+    res.json(incidents.map((incident) => ({
+      ...incident,
+      ticket_count: ticketSummary[incident.id]?.ticket_count || 0,
+      ticket_ids: ticketSummary[incident.id]?.ticket_ids || []
+    })));
+  } catch (err) {
+    logger.error('Failed to retrieve open incidents', 'ExpressAPI', err);
+    res.status(500).json({ error: 'Failed to retrieve open incidents' });
   }
 });
 

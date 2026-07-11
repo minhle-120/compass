@@ -8,6 +8,13 @@ const SEARCH_FIELDS = [
 
 const ARRAY_FIELDS = ['platforms', 'regions', 'services', 'keywords'];
 
+const SEVERITY_ORDER = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  low: 3
+};
+
 const STOP_WORDS = new Set([
   'a', 'an', 'and', 'are', 'for', 'game', 'i', 'in', 'is', 'it', 'my',
   'of', 'on', 'or', 'player', 'players', 'the', 'to', 'with'
@@ -69,6 +76,22 @@ function mapIncident(row) {
   }
   return incident;
 }
+
+export function listUnresolvedIncidents({ limit = 50 } = {}) {
+  const safeLimit = Math.min(Math.max(Number.parseInt(limit, 10) || 50, 1), 100);
+  return getIncidentDb().prepare(`
+    SELECT * FROM incidents
+    WHERE status IN ('active', 'monitoring')
+  `).all()
+    .map(mapIncident)
+    .sort((a, b) =>
+      (SEVERITY_ORDER[a.severity] ?? 99) - (SEVERITY_ORDER[b.severity] ?? 99)
+      || String(b.updated_at).localeCompare(String(a.updated_at))
+      || a.id.localeCompare(b.id)
+    )
+    .slice(0, safeLimit);
+}
+
 
 export function searchIncidents(query, {
   limit = 10,

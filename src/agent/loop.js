@@ -15,6 +15,7 @@ import { parentPort, threadId } from 'worker_threads';
 const FLAG_BY_TOOL = {
   read_ticket: 'wasTicketRead',
   inspect_ticket_attachments: 'wasAttachmentsInspected',
+  compare_same_type_tickets: 'wasSameTypeTicketsCompared',
   classify_ticket: 'wasClassified',
   draft_response: 'wasResponseDrafted',
   search_incidents: 'wasIncidentsChecked',
