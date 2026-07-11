@@ -1,4 +1,4 @@
-// src/tools/read_ticket.js
+import { getTicket } from '../database/sqlite.js';
 
 export const schema = {
   type: 'function',
@@ -13,5 +13,11 @@ export const schema = {
 };
 
 export async function handler(args, sessionContext) {
-  return 'Ticket content stub';
+  const { ticketId } = sessionContext;
+  const ticket = getTicket(ticketId);
+  if (!ticket) {
+    throw new Error(`Ticket "${ticketId}" not found in database.`);
+  }
+  return JSON.stringify(ticket);
 }
+
