@@ -13,9 +13,27 @@ const workerScriptPath = join(__dirname, 'agentWorker.js');
 class WorkerPool {
   constructor() {
     this.activeWorkers = new Set();
+    this.activeWorkersMap = new Map(); // ticketId -> state
     this.timer = null;
     this.isChecking = false;
   }
+
+  updateActiveWorkerState(ticketId, msg) {
+    if (this.activeWorkersMap.has(ticketId)) {
+      const state = this.activeWorkersMap.get(ticketId);
+      state.step = msg.step;
+      if (msg.toolName !== undefined) state.toolName = msg.toolName;
+      if (msg.toolArgs !== undefined) state.toolArgs = msg.toolArgs;
+      if (msg.tokenCount !== undefined) state.tokenCount = msg.tokenCount;
+      if (msg.flags !== undefined) state.flags = msg.flags;
+      this.activeWorkersMap.set(ticketId, state);
+    }
+  }
+
+  getActiveStates() {
+    return Array.from(this.activeWorkersMap.values());
+  }
+
 
   /**
    * Start polling the SQLite database for pending tickets.
@@ -75,6 +93,23 @@ class WorkerPool {
     // Mark as running in database before spawning to prevent other threads/polls from grabbing it
     updateTicketStatus(ticketId, 'running');
 
+    // Register active worker state in the pool's tracker map
+    this.activeWorkersMap.set(ticketId, {
+      ticketId,
+      startTime: new Date().toISOString(),
+      step: 'spawned',
+      toolName: null,
+      toolArgs: null,
+      tokenCount: 0,
+      flags: {
+        wasTicketRead: false,
+        wasIncidentsChecked: false,
+        wasClassified: false,
+        wasResponseDrafted: false,
+        wasRouted: false
+      }
+    });
+
     try {
       const worker = new Worker(workerScriptPath, {
         workerData: { ticketId }
@@ -92,6 +127,7 @@ class WorkerPool {
         }
         updateTicketStatus(ticketId, 'failed', `Execution timeout: Worker thread hung for more than ${config.workerTimeoutMs}ms`);
         this.activeWorkers.delete(worker);
+        this.activeWorkersMap.delete(ticketId);
         this.checkQueue();
       }, config.workerTimeoutMs);
 
@@ -100,6 +136,8 @@ class WorkerPool {
           logger.info(`[Worker Log - ${ticketId}] ${msg.message}`, 'WorkerPool');
         } else if (msg.type === 'status_update') {
           logger.debug(`[Status Update - ${ticketId}] Status: ${msg.status}`, 'WorkerPool');
+        } else if (msg.type === 'agent_activity') {
+          this.updateActiveWorkerState(ticketId, msg);
         }
       });
 
@@ -107,12 +145,14 @@ class WorkerPool {
         clearTimeout(watchdog);
         logger.error(`Error in worker for ticket ${ticketId}`, 'WorkerPool', err);
         updateTicketStatus(ticketId, 'failed', err.message || String(err));
+        this.activeWorkersMap.delete(ticketId);
       });
 
       worker.on('exit', (code) => {
         clearTimeout(watchdog);
         if (this.activeWorkers.has(worker)) {
           this.activeWorkers.delete(worker);
+          this.activeWorkersMap.delete(ticketId);
           logger.info(`Worker for ticket ${ticketId} exited with code ${code}. Active workers: ${this.activeWorkers.size}`, 'WorkerPool');
           // Immediately check queue when a slot opens up
           this.checkQueue();
@@ -122,6 +162,7 @@ class WorkerPool {
     } catch (err) {
       logger.error(`Failed to instantiate worker for ticket ${ticketId}`, 'WorkerPool', err);
       updateTicketStatus(ticketId, 'failed', `Failed to spawn worker: ${err.message}`);
+      this.activeWorkersMap.delete(ticketId);
     }
   }
 

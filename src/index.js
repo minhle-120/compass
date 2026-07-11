@@ -6,9 +6,10 @@ import { readFileSync, existsSync } from 'fs';
 
 import { config } from './config.js';
 import { logger } from './utils/logger.js';
-import { initDb, resetInterruptedTickets, getTicket, insertTicket, getDb } from './database/sqlite.js';
+import { initDb, resetInterruptedTickets, getTicket, insertTicket, getDb, getQueueStats } from './database/sqlite.js';
 import { pool } from './worker/pool.js';
 import { startValorantWikiSync } from './services/valorantWikiSync.js';
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -52,6 +53,28 @@ app.get('/api/tickets', (req, res) => {
   } catch (err) {
     logger.error('Failed to retrieve tickets from database', 'ExpressAPI', err);
     res.status(500).json({ error: 'Failed to retrieve tickets' });
+  }
+});
+
+// API Endpoint to fetch the system management layer and active worker status
+app.get('/api/system/status', (req, res) => {
+  try {
+    const queueStats = getQueueStats();
+    const activeStates = pool.getActiveStates();
+
+    res.json({
+      management: {
+        concurrencyCap: config.concurrencyCap,
+        activeWorkersCount: activeStates.length,
+        llmProvider: config.llmProvider,
+        pollIntervalMs: config.pollIntervalMs,
+        queue: queueStats
+      },
+      activeAgents: activeStates
+    });
+  } catch (err) {
+    logger.error('Failed to retrieve system status', 'ExpressAPI', err);
+    res.status(500).json({ error: 'Failed to retrieve system status' });
   }
 });
 

@@ -184,3 +184,15 @@ export function insertTicket(ticket) {
     conversation: ticket.conversation ? JSON.stringify(ticket.conversation) : null
   });
 }
+
+export function getQueueStats() {
+  const database = getDb();
+  const stmt = database.prepare('SELECT status, COUNT(*) as count FROM tickets GROUP BY status');
+  const rows = stmt.all();
+  const stats = { pending: 0, running: 0, completed: 0, escalated: 0, failed: 0 };
+  for (const row of rows) {
+    stats[row.status] = row.count;
+  }
+  return stats;
+}
+
