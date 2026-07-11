@@ -103,13 +103,14 @@ export async function runAgentLoop(sessionContext) {
     let url;
     let headers = { 'Content-Type': 'application/json' };
     let modelName;
-    let requestTimeout = 45000; // default 45s for cloud API
+    let requestTimeout = config.openaiTimeoutMs;
 
     if (config.llmProvider === 'llamacpp') {
       const baseUrl = config.llamacppUrl.replace(/\/$/, '');
       url = `${baseUrl}/v1/chat/completions`;
       modelName = config.llamacppModel;
-      requestTimeout = 120000; // 120s timeout for slower local generations
+      requestTimeout = config.llamacppTimeoutMs;
+
       
       // If user supplied API key in .env for local proxy, pass it, otherwise ignore
       if (config.openaiApiKey) {

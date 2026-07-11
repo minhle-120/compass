@@ -88,9 +88,14 @@ app.post('/api/tickets/:id/messages', (req, res) => {
     const { id } = req.params;
     const { sender, message } = req.body;
 
-    if (!message) {
-      return res.status(400).json({ error: 'Message content is required' });
+    // Validate inputs
+    if (!message || typeof message !== 'string' || !message.trim()) {
+      return res.status(400).json({ error: 'A valid string message content is required' });
     }
+    if (sender && (typeof sender !== 'string' || !sender.trim())) {
+      return res.status(400).json({ error: 'Sender must be a valid string if provided' });
+    }
+
 
     const ticket = getTicket(id);
     if (!ticket) {
@@ -149,8 +154,16 @@ app.post('/api/tickets/:id/messages', (req, res) => {
 app.post('/api/tickets', (req, res) => {
   try {
     const ticketData = req.body;
-    if (!ticketData.id) {
-      return res.status(400).json({ error: 'Ticket ID is required' });
+    
+    // Request input validation
+    if (!ticketData.id || typeof ticketData.id !== 'string' || !ticketData.id.trim()) {
+      return res.status(400).json({ error: 'A valid string Ticket ID is required' });
+    }
+    if (!ticketData.subject || typeof ticketData.subject !== 'string' || !ticketData.subject.trim()) {
+      return res.status(400).json({ error: 'A valid string Ticket Subject is required' });
+    }
+    if (!ticketData.description || typeof ticketData.description !== 'string' || !ticketData.description.trim()) {
+      return res.status(400).json({ error: 'A valid string Ticket Description is required' });
     }
 
     // Default status is pending
@@ -168,6 +181,7 @@ app.post('/api/tickets', (req, res) => {
     res.status(500).json({ error: 'Failed to queue ticket' });
   }
 });
+
 
 // Start Express server
 const port = config.port;

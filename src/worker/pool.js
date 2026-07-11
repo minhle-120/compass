@@ -82,8 +82,20 @@ class WorkerPool {
 
       this.activeWorkers.add(worker);
 
+      // Thread Execution Watchdog Timer
+      const watchdog = setTimeout(async () => {
+        logger.error(`Worker for ticket ${ticketId} exceeded execution budget of ${config.workerTimeoutMs}ms. Terminating thread.`, 'WorkerPool');
+        try {
+          await worker.terminate();
+        } catch (termErr) {
+          logger.error(`Failed to force terminate worker for ticket ${ticketId}`, 'WorkerPool', termErr);
+        }
+        updateTicketStatus(ticketId, 'failed', `Execution timeout: Worker thread hung for more than ${config.workerTimeoutMs}ms`);
+        this.activeWorkers.delete(worker);
+        this.checkQueue();
+      }, config.workerTimeoutMs);
+
       worker.on('message', (msg) => {
-        // Handle custom messages from the agent worker thread if needed
         if (msg.type === 'log') {
           logger.info(`[Worker Log - ${ticketId}] ${msg.message}`, 'WorkerPool');
         } else if (msg.type === 'status_update') {
@@ -92,16 +104,19 @@ class WorkerPool {
       });
 
       worker.on('error', (err) => {
+        clearTimeout(watchdog);
         logger.error(`Error in worker for ticket ${ticketId}`, 'WorkerPool', err);
         updateTicketStatus(ticketId, 'failed', err.message || String(err));
       });
 
       worker.on('exit', (code) => {
-        this.activeWorkers.delete(worker);
-        logger.info(`Worker for ticket ${ticketId} exited with code ${code}. Active workers: ${this.activeWorkers.size}`, 'WorkerPool');
-        
-        // Immediately check queue when a slot opens up
-        this.checkQueue();
+        clearTimeout(watchdog);
+        if (this.activeWorkers.has(worker)) {
+          this.activeWorkers.delete(worker);
+          logger.info(`Worker for ticket ${ticketId} exited with code ${code}. Active workers: ${this.activeWorkers.size}`, 'WorkerPool');
+          // Immediately check queue when a slot opens up
+          this.checkQueue();
+        }
       });
 
     } catch (err) {
@@ -109,6 +124,7 @@ class WorkerPool {
       updateTicketStatus(ticketId, 'failed', `Failed to spawn worker: ${err.message}`);
     }
   }
+
 }
 
 export const pool = new WorkerPool();

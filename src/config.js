@@ -13,8 +13,10 @@ export const config = {
   llmProvider: process.env.LLM_PROVIDER || 'openai',
   llamacppUrl: process.env.LLAMACPP_URL || 'http://localhost:8080',
   llamacppModel: process.env.LLAMACPP_MODEL || 'local-model',
+  openaiTimeoutMs: 45000,
+  llamacppTimeoutMs: 120000,
+  workerTimeoutMs: 300000, // 5 minutes watchdog timeout
 
-  
   // Game Support Agent System Instructions
   systemPrompt: `
 You are the P12 Game Support Agent. You communicate EXCLUSIVELY through tool calls.
