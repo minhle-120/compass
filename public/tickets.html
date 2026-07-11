@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Browse Tickets — Compass</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <style>
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid var(--color-border);
+      margin-bottom: 16px;
+      gap: 16px;
+    }
+    .tab {
+      padding: 8px 16px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--color-fg-muted);
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+    }
+    .tab.active {
+      color: var(--color-fg-default);
+      border-bottom-color: #fd8c73;
+    }
+    .ticket-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      overflow: hidden;
+      background-color: var(--color-bg);
+    }
+    .ticket-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--color-border);
+      text-decoration: none;
+      color: inherit;
+      transition: background-color 0.15s ease;
+    }
+    .ticket-row:last-child {
+      border-bottom: none;
+    }
+    .ticket-row:hover {
+      background-color: var(--color-bg-subtle);
+    }
+    .ticket-info {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .ticket-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--color-fg-default);
+    }
+    .ticket-meta {
+      font-size: 12px;
+      color: var(--color-fg-muted);
+      font-family: var(--font-sans);
+    }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 2px 8px;
+      border-radius: 12px;
+      text-transform: capitalize;
+    }
+    .status-pending { background-color: var(--color-bg-subtle); color: var(--color-fg-muted); border: 1px solid var(--color-border); }
+    .status-running { background-color: #ddf4ff; color: #0969da; border: 1px solid rgba(9, 105, 218, 0.2); }
+    .status-completed { background-color: #dafbe1; color: #1a7f37; border: 1px solid rgba(26, 127, 55, 0.2); }
+    .status-escalated { background-color: #fbe5ff; color: #8250df; border: 1px solid rgba(130, 80, 223, 0.2); }
+    .status-failed { background-color: #ffebe9; color: #cf222e; border: 1px solid rgba(207, 34, 46, 0.2); }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="header-left">
+      <a href="/" class="header-logo">⊙ Compass</a>
+      <nav class="header-nav">
+        <a href="/submit.html">Submit Ticket</a>
+        <a href="/tickets.html" class="active">Browse Tickets</a>
+        <a href="/dashboard.html">Dashboard</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container" style="max-width: 800px;">
+    <div class="page-heading">
+      <h1>Support Tickets</h1>
+      <p class="subtitle" style="color: var(--color-fg-muted); margin-top: 4px;">Browse and track support requests submitted by players.</p>
+    </div>
+
+    <!-- Tabs for Filtering -->
+    <div class="tabs">
+      <div class="tab active" id="tab-open">Open Tickets (0)</div>
+      <div class="tab" id="tab-closed">Closed Tickets (0)</div>
+    </div>
+
+    <!-- Ticket List Container -->
+    <div id="tickets-container" class="ticket-list">
+      <div style="padding: 24px; text-align: center; color: var(--color-fg-muted);">
+        Loading tickets...
+      </div>
+    </div>
+  </main>
+
+  <script src="/js/tickets.js"></script>
+</body>
+</html>
