@@ -68,43 +68,27 @@ export function initDb() {
     CREATE INDEX IF NOT EXISTS idx_incident_region ON incident(region);
     CREATE INDEX IF NOT EXISTS idx_incident_platform ON incident(platform);
 
-    CREATE TABLE IF NOT EXISTS kb_articles (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'published',
-      platforms TEXT, /* JSON array of strings */
-      game_versions TEXT,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      summary TEXT NOT NULL,
-      excerpt TEXT NOT NULL DEFAULT '',
-      content TEXT NOT NULL
+    CREATE TABLE IF NOT EXISTS problems (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      category TEXT NOT NULL,
+      severity TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open', 'resolved', 'closed')),
+      source TEXT NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+      description_signature TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
     );
 
-    CREATE TABLE IF NOT EXISTS slang (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      slang TEXT NOT NULL UNIQUE COLLATE NOCASE,
-      description TEXT NOT NULL,
-      example TEXT,
-      context TEXT,
-      source TEXT NOT NULL CHECK(source IN ('genz', 'game'))
+    CREATE TABLE IF NOT EXISTS problem_tickets (
+      problem_id INTEGER NOT NULL REFERENCES problems(id) ON DELETE CASCADE,
+      ticket_id TEXT NOT NULL UNIQUE REFERENCES tickets(id) ON DELETE CASCADE,
+      linked_at TEXT NOT NULL,
+      PRIMARY KEY (problem_id, ticket_id)
     );
 
-    CREATE TABLE IF NOT EXISTS slang_terms (
-      term TEXT PRIMARY KEY,
-      canonical_form TEXT,
-      language TEXT,
-      meaning TEXT NOT NULL,
-      common_uses TEXT, /* JSON array of strings */
-      interpretation_notes TEXT,
-      related_terms TEXT /* JSON array of strings */
-    );
-    
-    CREATE TABLE IF NOT EXISTS unknown_slang (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      term TEXT NOT NULL,
-      context TEXT NOT NULL,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP
-    );
+    CREATE INDEX IF NOT EXISTS idx_problems_open_category_signature
+      ON problems(status, category, description_signature);
   `);
 
   // Keep existing databases compatible when new workflow columns are added.
@@ -395,6 +379,69 @@ export function getQueueStats() {
     if (row.status in stats) stats[row.status] = row.count;
   }
   return stats;
+}
+
+export function clusterTicketIntoProblem(ticketId, category, severity, reason) {
+  const database = getDb();
+  const ticket = getTicket(ticketId);
+  if (!ticket) {
+    throw new Error(`Ticket "${ticketId}" not found.`);
+  }
+
+  // Ignore casing, punctuation, and repeated whitespace when comparing reports.
+  const descriptionSignature = String(ticket.description || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+  if (!descriptionSignature) {
+    throw new Error(`Ticket "${ticketId}" has no description to compare.`);
+  }
+
+  const existingLink = database.prepare(`
+    SELECT p.id, p.category, p.severity, p.reason, p.status, p.source
+    FROM problem_tickets pt
+    JOIN problems p ON p.id = pt.problem_id
+    WHERE pt.ticket_id = ?
+  `).get(ticketId);
+  if (existingLink) {
+    return { problem: existingLink, action: 'already_linked' };
+  }
+
+  const matchingProblem = database.prepare(`
+    SELECT id, category, severity, reason, status, source
+    FROM problems
+    WHERE status = 'open' AND category = ? AND description_signature = ?
+    LIMIT 1
+  `).get(category, descriptionSignature);
+
+  const now = new Date().toISOString();
+  if (matchingProblem) {
+    database.prepare(`
+      INSERT INTO problem_tickets (problem_id, ticket_id, linked_at)
+      VALUES (?, ?, ?)
+    `).run(matchingProblem.id, ticketId, now);
+    return { problem: matchingProblem, action: 'added_to_pile' };
+  }
+
+  const result = database.prepare(`
+    INSERT INTO problems (
+      category, severity, reason, status, source, description_signature, created_at, updated_at
+    ) VALUES (?, ?, ?, 'open', ?, ?, ?, ?)
+  `).run(category, severity, reason, ticketId, descriptionSignature, now, now);
+
+  const problem = {
+    id: Number(result.lastInsertRowid),
+    category,
+    severity,
+    reason,
+    status: 'open',
+    source: ticketId
+  };
+  database.prepare(`
+    INSERT INTO problem_tickets (problem_id, ticket_id, linked_at)
+    VALUES (?, ?, ?)
+  `).run(problem.id, ticketId, now);
+  return { problem, action: 'created_problem' };
 }
 
 function parseConversation(value) {

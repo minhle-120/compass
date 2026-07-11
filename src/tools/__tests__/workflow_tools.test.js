@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 process.env.DB_PATH = ':memory:';
+process.env.WIKI_DB_PATH = ':memory:';
 
 const { getTicket, initDb, insertTicket } = await import('../../database/sqlite.js');
+const { initWikiDb } = await import('../../../services/wiki/wikiService.js');
 const { handler: readTicket } = await import('../read_ticket.js');
 const { handler: searchIncidents } = await import('../search_incidents.js');
 const { handler: classifyTicket } = await import('../classify_ticket.js');
@@ -17,7 +19,8 @@ describe('support workflow tools', () => {
   beforeEach(() => {
     const db = initDb();
     db.prepare('DELETE FROM tickets').run();
-    db.prepare('DELETE FROM kb_articles').run();
+    db.prepare('DELETE FROM problems').run();
+    db.prepare('DELETE FROM problem_tickets').run();
     insertTicket({
       id: 'T-ANDROID',
       subject: 'Crash after update',
@@ -25,21 +28,24 @@ describe('support workflow tools', () => {
       platform: 'Android',
       region: 'Global'
     });
-    db.prepare(`
-      INSERT INTO kb_articles (
-        id, title, status, platforms, game_versions, updated_at, summary, excerpt, content
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+
+    const wikiDb = initWikiDb();
+    wikiDb.prepare('DELETE FROM wiki_entries').run();
+    const now = new Date().toISOString();
+    wikiDb.prepare(`
+      INSERT INTO wiki_entries (
+        id, term, explanation, category, origin, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(
-      'KB-001',
+      243,
       'Android startup troubleshooting',
-      'published',
-      'Android',
-      'latest',
-      '2026-07-11T00:00:00Z',
-      'Steps for Android startup crashes.',
-      'Restart the device and check for updates.',
-      'Restart the device, clear the cache, and install the newest game update.'
+      'Restart the device, clear the cache, and install the newest game update.',
+      'mechanic',
+      'manual',
+      now,
+      now
     );
+
     context = { ticketId: 'T-ANDROID' };
   });
 
@@ -81,10 +87,11 @@ describe('support workflow tools', () => {
   });
 
   it('searches and retrieves real knowledge-base records', async () => {
-    const search = await searchKnowledgeBase({ query: 'Android startup crash' }, context);
-    expect(search.results[0].article_id).toBe('KB-001');
+    const search = await searchKnowledgeBase({ query: 'Android startup' }, context);
+    const articleId = search.results[0].article_id;
+    expect(articleId).toBe('wiki:243');
 
-    const details = await getKnowledgeBaseArticle({ article_id: 'kb-001' }, context);
+    const details = await getKnowledgeBaseArticle({ article_id: articleId }, context);
     expect(details.content).toContain('clear the cache');
   });
 });
