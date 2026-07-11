@@ -36,17 +36,17 @@ describe('incident tools', () => {
     ['android crash update', 'INC-004'],
     ['wrong ranked rewards', 'INC-005']
   ])('ranks the relevant incident first for "%s"', async (query, expectedId) => {
-    const result = JSON.parse(await searchIncidents({ query }, {}));
+    const result = await searchIncidents({ query }, {});
     expect(result.incidents[0].id).toBe(expectedId);
   });
 
   it('returns an empty list when no incidents match', async () => {
-    const result = JSON.parse(await searchIncidents({ query: 'voice chat' }, {}));
+    const result = await searchIncidents({ query: 'voice chat' }, {});
     expect(result).toEqual({ incidents: [] });
   });
 
   it('gets full incident details by ID', async () => {
-    const result = JSON.parse(await getIncidentDetails({ incident_id: 'inc-001' }, {}));
+    const result = await getIncidentDetails({ incident_id: 'inc-001' }, {});
     expect(result.incident).toEqual({
       id: 'INC-001',
       title: 'Players Unable to Log In',
@@ -60,7 +60,7 @@ describe('incident tools', () => {
   });
 
   it('returns an explicit result when the incident does not exist', async () => {
-    const result = JSON.parse(await getIncidentDetails({ incident_id: 'INC-999' }, {}));
+    const result = await getIncidentDetails({ incident_id: 'INC-999' }, {});
     expect(result).toEqual({ error: 'Incident "INC-999" not found', incident: null });
   });
 
