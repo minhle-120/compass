@@ -57,8 +57,9 @@ document.addEventListener('DOMContentLoaded', () => {
       ticketIdDisplay.textContent = ticket.id;
       
       // Update Status Badge
-      ticketStatus.textContent = ticket.status;
-      ticketStatus.className = `status-badge status-${ticket.status}`;
+      const isOpen = ['pending', 'running', 'awaiting_review', 'escalated', 'needs_clarification'].includes(ticket.status);
+      ticketStatus.textContent = isOpen ? 'Open' : 'Closed';
+      ticketStatus.className = `status-badge ${isOpen ? 'status-running' : 'status-completed'}`;
 
       // Update Resolution Badge (idle conclusion)
       if (ticket.resolution_type) {

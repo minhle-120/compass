@@ -55,13 +55,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // User-friendly status labels
       const statusMap = {
-        pending:    { label: 'In Queue',    cls: 'status-pending' },
-        running:    { label: 'Processing',  cls: 'status-running' },
-        awaiting_review: { label: 'Awaiting Review', cls: 'status-awaiting_review' },
-        escalated:  { label: 'Escalated',   cls: 'status-escalated' },
+        pending:    { label: 'Open',    cls: 'status-running' },
+        running:    { label: 'Open',    cls: 'status-running' },
+        awaiting_review: { label: 'Open', cls: 'status-running' },
+        escalated:  { label: 'Open',   cls: 'status-running' },
+        needs_clarification: { label: 'Open', cls: 'status-running' },
         completed:  { label: 'Closed',      cls: 'status-completed' },
         failed:     { label: 'Closed',      cls: 'status-completed' },
-        needs_clarification: { label: 'Needs Clarification', cls: 'status-needs_clarification' },
       };
       const s = statusMap[ticket.status] || { label: ticket.status, cls: `status-${ticket.status}` };
 
