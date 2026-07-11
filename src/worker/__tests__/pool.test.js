@@ -14,6 +14,7 @@ vi.mock('worker_threads', async (importOriginal) => {
       this.options = options;
       this.listeners = {};
       activeInstance = this;
+      this.terminate = vi.fn(async () => 1);
     }
 
     on(event, callback) {
@@ -52,6 +53,7 @@ describe('WorkerPool Orchestrator', () => {
     // Reset pool state
     pool.stop();
     pool.activeWorkers.clear();
+    pool.activeWorkersMap.clear();
     pool.isChecking = false;
     _resetMockInstance();
 
@@ -137,5 +139,88 @@ describe('WorkerPool Orchestrator', () => {
 
     // Initial check + 2 ticks = 3 calls
     expect(checkSpy).toHaveBeenCalledTimes(3);
+  });
+
+  it('should track and update active worker states in activeWorkersMap', async () => {
+    insertTicket({ id: 'T-TRACK-1', status: 'pending' });
+
+    await pool.checkQueue();
+
+    // Verify entry is registered
+    expect(pool.activeWorkersMap.has('T-TRACK-1')).toBe(true);
+    const initial = pool.activeWorkersMap.get('T-TRACK-1');
+    expect(initial.step).toBe('spawned');
+    expect(initial.tokenCount).toBe(0);
+
+    const worker = _getMockInstance();
+    expect(worker).not.toBeNull();
+
+    // Simulate sending agent_activity update from worker thread
+    worker.trigger('message', {
+      type: 'agent_activity',
+      step: 'executing_tool:read_ticket',
+      toolName: 'read_ticket',
+      toolArgs: {},
+      tokenCount: 150,
+      flags: { wasTicketRead: true }
+    });
+
+    const updated = pool.activeWorkersMap.get('T-TRACK-1');
+    expect(updated.step).toBe('executing_tool:read_ticket');
+    expect(updated.toolName).toBe('read_ticket');
+    expect(updated.tokenCount).toBe(150);
+    expect(updated.flags.wasTicketRead).toBe(true);
+
+    // Simulate exit and ensure the entry is deleted
+    worker.trigger('exit', 0);
+    expect(pool.activeWorkersMap.has('T-TRACK-1')).toBe(false);
+  });
+
+  it('should not spawn a second worker for an active ticket', async () => {
+    insertTicket({ id: 'T-DUPLICATE', status: 'pending' });
+    await pool.checkQueue();
+
+    updateTicketStatus('T-DUPLICATE', 'pending');
+    await pool.checkQueue();
+
+    expect(pool.activeWorkers.size).toBe(1);
+    expect(pool.activeWorkersMap.size).toBe(1);
+    expect(getTicket('T-DUPLICATE').status).toBe('pending');
+  });
+
+  it('should re-arm the inactivity watchdog when progress is reported', async () => {
+    const originalTimeout = config.workerTimeoutMs;
+    config.workerTimeoutMs = 100;
+    insertTicket({ id: 'T-HEARTBEAT', status: 'pending' });
+
+    try {
+      await pool.checkQueue();
+      const worker = _getMockInstance();
+
+      await vi.advanceTimersByTimeAsync(80);
+      worker.trigger('message', { type: 'agent_activity', step: 'awaiting_llm_completion' });
+      await vi.advanceTimersByTimeAsync(80);
+      expect(worker.terminate).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(21);
+      expect(worker.terminate).toHaveBeenCalledOnce();
+      expect(getTicket('T-HEARTBEAT')).toMatchObject({
+        status: 'failed',
+        error_message: 'Execution timeout: no worker progress for 100ms'
+      });
+    } finally {
+      config.workerTimeoutMs = originalTimeout;
+    }
+  });
+
+  it('should reject a direct duplicate spawn request', () => {
+    insertTicket({ id: 'T-DIRECT-DUPLICATE', status: 'pending' });
+
+    pool.spawnWorker('T-DIRECT-DUPLICATE');
+    const duplicate = pool.spawnWorker('T-DIRECT-DUPLICATE');
+
+    expect(duplicate).toBeNull();
+    expect(pool.activeWorkers.size).toBe(1);
+    expect(pool.activeWorkersMap.size).toBe(1);
   });
 });

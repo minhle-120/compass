@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — Compass</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <header class="header">
+    <div class="header-left">
+      <a href="/" class="header-logo">⊙ Compass</a>
+      <nav class="header-nav">
+        <a href="/submit.html">Submit Ticket</a>
+        <a href="/tickets.html">Browse Tickets</a>
+        <a href="/dashboard.html" class="active">Dashboard</a>
+      </nav>
+    </div>
+    <span id="poll-indicator" class="text-sm text-muted">Live — polling every 3s</span>
+  </header>
+
+  <main class="container-wide">
+
+    <!-- Management Layer -->
+    <section id="management-section" class="mb-4">
+      <div class="page-heading">
+        <h1>Management Layer</h1>
+        <span id="provider-label" class="label label-running"></span>
+      </div>
+      <div id="stats" class="stats-grid">
+        <div class="stat-card"><div class="stat-value" id="stat-pending">–</div><div class="stat-label">Pending</div></div>
+        <div class="stat-card"><div class="stat-value" id="stat-running">–</div><div class="stat-label">Running</div></div>
+        <div class="stat-card"><div class="stat-value" id="stat-completed">–</div><div class="stat-label">Completed</div></div>
+        <div class="stat-card"><div class="stat-value" id="stat-failed">–</div><div class="stat-label">Failed</div></div>
+        <div class="stat-card"><div class="stat-value" id="stat-concurrency">–</div><div class="stat-label">Workers</div></div>
+      </div>
+    </section>
+
+    <!-- Active Agents -->
+    <section id="agents-section" class="mb-4">
+      <div class="page-heading">
+        <h1>Active Agents</h1>
+        <span id="agent-count" class="text-muted text-sm"></span>
+      </div>
+      <div id="agents-container">
+        <div class="empty-state"><h3>No active agents</h3><p>Agents will appear here when processing tickets.</p></div>
+      </div>
+    </section>
+
+    <!-- Ticket List -->
+    <section id="tickets-section">
+      <div class="page-heading">
+        <h1>All Tickets</h1>
+        <a href="/submit.html" class="btn btn-primary btn-sm">New Ticket</a>
+      </div>
+      <div class="box">
+        <table class="ticket-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Subject</th>
+              <th>Status</th>
+              <th>Resolution</th>
+              <th>Routing</th>
+              <th>Categories</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody id="ticket-tbody">
+            <tr><td colspan="7" class="empty-state">Loading tickets…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Ticket Detail Overlay -->
+    <div id="detail-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.3); z-index:100; overflow-y:auto;">
+      <div style="max-width:800px; margin:48px auto; background:var(--color-bg); border:1px solid var(--color-border); border-radius:var(--radius-lg); box-shadow:var(--shadow-md);">
+        <div class="box-header" style="position:sticky; top:0;">
+          <span id="detail-title">Ticket Detail</span>
+          <button id="detail-close" class="btn btn-sm">✕ Close</button>
+        </div>
+        <div class="box-body">
+          <dl id="detail-fields" class="detail-grid"></dl>
+          <div id="detail-actions" style="display:none; margin-top:16px;"></div>
+        </div>
+        <div class="box-header" style="border-radius:0;">
+          <span>Agent Conversation History</span>
+          <div style="display:flex; gap:4px;">
+            <button id="history-human" class="btn btn-sm btn-primary" type="button">Human readable</button>
+            <button id="history-raw" class="btn btn-sm" type="button">Raw</button>
+          </div>
+        </div>
+        <div class="box-body" id="detail-history">
+          <div class="text-muted">Loading…</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script type="module" src="/js/dashboard.js"></script>
+</body>
+</html>

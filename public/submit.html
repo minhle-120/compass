@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Submit Ticket — Compass</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <header class="header">
+    <div class="header-left">
+      <a href="/" class="header-logo">⊙ Compass</a>
+      <nav class="header-nav">
+        <a href="/submit.html" class="active">Submit Ticket</a>
+        <a href="/tickets.html">Browse Tickets</a>
+        <a href="/dashboard.html">Dashboard</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container" style="max-width: 640px;">
+    <div class="page-heading">
+      <h1>New Support Ticket</h1>
+      <p class="subtitle" style="color: var(--color-fg-muted); margin-top: 4px;">Submit a customer issue to be processed by the support system.</p>
+    </div>
+
+    <div id="flash" class="flash"></div>
+
+    <form id="ticket-form" autocomplete="off">
+      <div class="box">
+        <div class="box-header">Ticket Details</div>
+        <div class="box-body">
+          <div class="form-group">
+            <label for="ticket-subject">Subject</label>
+            <input type="text" id="ticket-subject" class="form-control" placeholder="Brief summary of the issue (e.g. Account login issue)" required>
+          </div>
+
+          <div class="form-group">
+            <label for="ticket-description">Description</label>
+            <span class="hint">Please describe the problem in detail so the AI support agent can resolve it.</span>
+            <textarea id="ticket-description" class="form-control" rows="6" placeholder="Provide full context, symptoms, or error messages..." required></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-4" style="display: flex; justify-content: flex-end; gap: 8px;">
+        <button type="reset" class="btn">Clear</button>
+        <button type="submit" id="submit-btn" class="btn btn-primary">Submit Ticket</button>
+      </div>
+    </form>
+  </main>
+
+  <script src="/js/submit.js"></script>
+</body>
+</html>

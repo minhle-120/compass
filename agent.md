@@ -11,7 +11,7 @@ Compass utilizes a **Circular Agent** pattern. The AI agent communicates exclusi
 ```mermaid
 graph TD
     subgraph Management Level [Management Level - Parent Thread]
-        A[index.js - Express API] --> B[database.sqlite - SQLite Queue]
+        A[index.js - Express API] --> B[src/data/database.sqlite - SQLite Queue]
         B --> C[pool.js - Worker Pool]
       end
 
@@ -25,14 +25,20 @@ graph TD
 
 ### 1.1 Management Level (Parent Thread)
 * **Express Web Server (`src/index.js`)**: Hosts endpoints to serve the web dashboard, submit support tickets, and fetch conversation audit logs.
-* **SQLite Database (`src/database/sqlite.js`)**: The source of truth for the ticket queue, live incident tables, knowledge base articles, and slang.
-* **Worker Pool (`src/worker/pool.js`)**: Polling orchestrator that manages concurrency (capped at 5 tickets) and spawns isolated `worker_threads` for pending tickets.
+* **SQLite Database (`src/database/sqlite.js`)**: Low-level infrastructural driver for the ticket queue database. Manages tables, transactions, state mutations, and startup queue cleanups.
+* **Worker Pool (`src/worker/pool.js`)**: Polling orchestrator that manages concurrency (capped at 5 tickets), prevents duplicate workers per ticket, and runs a progress-based inactivity watchdog.
 * **Crash Recovery**: During initialization, the manager resets any ticket stuck in `running` status back to `pending` so the queue resumes gracefully on startup.
 
 ### 1.2 Agent Level (Worker Threads)
-* **Worker Wrapper (`src/worker/agentWorker.js`)**: Runs a dedicated thread per ticket. It manages a temporary `sessionContext` tracking checklist validation flags in thread memory.
+* **Worker Wrapper (`src/worker/agentWorker.js`)**: Runs a dedicated thread per ticket. It initializes workflow revision and checklist state, which the loop reconstructs from successful persisted tool outcomes after interruption.
 * **ReAct Executor (`src/agent/loop.js`)**: Runs the prompt loop. It sends the conversation history to the model, parses tool requests, handles JSON checkpointing, and enforces the token safety budget.
+
 * **Tool Registry (`src/agent/registry.js`)**: A dynamic plugin broker. It scans the `src/tools/` folder, auto-registers any tool defining a `schema` and a `handler` via dynamic ES imports, and intercepts the `idle` call to run checks.
+
+### 1.3 Services Layer (Domain Services)
+* **Ticket Service (`services/ticket/`)**: High-level repository pattern for ticket querying. Resolves ticket information and writes outcomes back to the queue.
+* **Incident, KB, & Slang Services (`services/`)**: Isolate system incidents, knowledge base FAQs, and slang databases. These modules encapsulate their own independent data stores (e.g. JSON files or separate databases) completely detached from the core queue database.
+
 
 ---
 
@@ -51,19 +57,19 @@ compass/
 │   └── js/
 │       └── app.js             # Form poster, real-time polling, and ReAct log viewer
 │
-├── services/                  # Database Adapters (To be implemented)
-│   ├── ticket/
-│   ├── incident/
-│   ├── kb/
-│   └── slang/
+├── services/                  # Business Domain Services (Separate data stores)
+│   ├── ticket/                # Ticket reader & writer repository adapter
+│   ├── incident/              # Live incident lookup service
+│   ├── kb/                    # Knowledge base FAQ query service
+│   └── slang/                 # Slang glossary lookup & feedback service
 │
 └── src/                       # Agent Core
     ├── index.js               # Entry point & Express routes
     ├── config.js              # Centralized configs and system prompts
     ├── database/
-    │   ├── sqlite.js          # SQLite database schema and helper functions
+    │   ├── sqlite.js          # SQLite queue database driver (infrastructural)
     │   └── __tests__/
-    │       └── sqlite.test.js # Database unit tests
+    │       └── sqlite.test.js # Queue driver unit tests
     │
     ├── worker/
     │   ├── pool.js            # Worker thread orchestrator
@@ -99,22 +105,26 @@ To prevent runaway model completions and save budget, `loop.js` tracks cumulativ
 * It extracts **`response.data.usage.total_tokens`** from the OpenAI-compatible completions API response.
 * If the token count exceeds the `contextTokenBudget` (60,000 tokens), it exits the loop immediately, updates the status in SQLite to `escalated` (reason: `Context token limit reached`), and logs the event.
 
-### 3.2 Selective Tail Validation
+### 3.2 History Recovery and Workflow Revisions
 If a thread crashes mid-turn, the history file (`src/data/history/{ticketId}.json`) might contain an assistant message listing `tool_calls` without matching `tool` results.
-* On thread startup, `loop.js` inspects the tail of the conversation history. If it finds a dangling assistant turn, it pops/prunes it to restore a valid conversation state before requesting completions.
+* History is written through atomic temporary-file renames.
+* On startup, `loop.js` adds structured interruption results for unmatched tool calls, preserving valid completed calls.
+* Successful structured tool results reconstruct checklist flags after a worker restart.
+* Player replies increment a SQLite workflow revision. The next worker appends one revision-specific wake-up message and reprocesses the ticket without racing the previous worker's history writes.
 
 ### 3.3 Dynamic Tool Registration (Plugin System)
 `src/agent/registry.js` uses dynamic ESM imports:
 * It reads `src/tools/` for any `.js` file (excluding tests).
 * It performs `await import("file://...")`.
-* If the module exports `schema` and `handler`, it auto-registers it using the name defined in the schema.
+* Every module must export a valid `schema.function.name` and `handler`; duplicate or invalid tools fail startup instead of creating a partial registry.
 * To add a tool, simply create a file in `src/tools/` exporting these properties. No static imports are needed.
 
 ### 3.4 Local In-Worker Validation (The `idle` Contract)
 When the model invokes the `idle` tool:
 1. `registry.js` intercepts it and checks `sessionContext.flags`.
 2. It verifies that `wasTicketRead`, `wasIncidentsChecked`, `wasClassified`, `wasResponseDrafted`, and `wasRouted` are all `true`.
-3. If any checks fail, it blocks the idle execution and returns a detailed validation error message back to the LLM (e.g., `Validation failed! You are missing required steps: classify_ticket.`). This forces the model to correct its course and execute the missing tool.
+3. Flags are set only after a handler succeeds. If checks fail, `idle` returns a structured, non-terminal `WORKFLOW_INCOMPLETE` result so the model can correct the missing work.
+4. Successful finalization writes status, resolution type, and resolution reason in one transaction. If a newer player reply is pending, finalization does not overwrite it.
 
 ---
 
@@ -124,6 +134,10 @@ The system supports switching between standard OpenAI API and a local model runn
 
 * **OpenAI mode**: Resolves `https://api.openai.com/v1/chat/completions` using the `OPENAI_API_KEY` header.
 * **Llama.cpp mode**: Resolves `${LLAMACPP_URL}/v1/chat/completions` (default `http://localhost:8080`), uses longer request timeouts (120 seconds) for slow local hardware, and does not require an API key to run.
+
+### Draft response delivery
+
+Set `DRAFT_RESPONSE_MODE=auto_response` to publish finalized drafts directly into the player conversation. The default, `staff_review`, keeps drafts internal with a `pending_review` status until staff approves them from the dashboard.
 
 ---
 

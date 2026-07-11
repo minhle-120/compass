@@ -15,8 +15,12 @@ async function start() {
   logger.info(`Agent worker thread started for ticket ${ticketId}`, `Ticket-${ticketId}`);
   
   // Track checklist progress locally in the worker thread memory
+  const ticket = getTicket(ticketId);
+  if (!ticket) throw new Error(`Ticket "${ticketId}" not found before worker startup.`);
+
   const sessionContext = {
     ticketId,
+    workflowRevision: ticket.workflow_revision || 0,
     flags: {
       wasTicketRead: false,
       wasClassified: false,
@@ -39,7 +43,6 @@ async function start() {
     }
     
     logger.info(`Agent worker thread completed execution for ticket ${ticketId} with status ${result.status}`, `Ticket-${ticketId}`);
-    process.exit(0);
   } catch (err) {
     logger.error(`Agent worker thread crashed for ticket ${ticketId}`, `Ticket-${ticketId}`, err);
     
@@ -50,8 +53,10 @@ async function start() {
       logger.error('Failed to update ticket status to failed in database', `Ticket-${ticketId}`, dbErr);
     }
     
-    process.exit(1);
+    // Rethrow to bubble error up to parentPort 'error' listener and terminate thread
+    throw err;
   }
 }
+
 
 start();
