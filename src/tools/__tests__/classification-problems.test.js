@@ -70,6 +70,40 @@ describe('classify_ticket problem clustering', () => {
     expect(result.exact_match.tickets.map((ticket) => ticket.id)).toEqual(['T-OLD']);
   });
 
+  it('uses the exact comparison match when classification wording drifts', async () => {
+    insertTicket({ id: 'T-OLD', description: 'Game crashes with ultra graphics.', status: 'pending' });
+    insertTicket({ id: 'T-NEW', description: 'My game crashes when ultra graphics is enabled.', status: 'pending' });
+
+    const first = JSON.parse(await classifyTicket({
+      categories: ['bug'],
+      severity: 'high',
+      rationale: 'Crash tied to graphics setting.',
+      problem_summary: 'Game crashes when starting a match',
+      problem_reason: 'Ultra graphics setting is enabled'
+    }, { ticketId: 'T-OLD' }));
+
+    const context = { ticketId: 'T-NEW' };
+    await compareSameTypeTickets({
+      category: 'bug',
+      problem_summary: 'Game crashes when starting a match',
+      problem_reason: 'Ultra graphics setting is enabled'
+    }, context);
+
+    const second = JSON.parse(await classifyTicket({
+      categories: ['bug'],
+      severity: 'high',
+      rationale: 'Same crash report with slightly different wording.',
+      problem_summary: 'Client closes when entering gameplay',
+      problem_reason: 'Graphics quality is set too high'
+    }, context));
+
+    expect(second.problem_action).toBe('added_to_existing_problem');
+    expect(second.problem.id).toBe(first.problem.id);
+    expect(second.problem_summary).toBe('Game crashes when starting a match');
+    expect(second.problem_reason).toBe('Ultra graphics setting is enabled');
+    expect(getDb().prepare('SELECT COUNT(*) AS count FROM problems').get().count).toBe(1);
+  });
+
   it('keeps same-symptom tickets separate when the reason is different', async () => {
     insertTicket({ id: 'T-GFX', description: 'Game crashes when I start a match with ultra graphics.', status: 'pending' });
     insertTicket({ id: 'T-CONTROLLER', description: 'Game crashes when I start a match using a controller.', status: 'pending' });
@@ -93,9 +127,9 @@ describe('classify_ticket problem clustering', () => {
     expect(second.problem_action).toBe('created_problem');
   });
 
-  it('promotes a high-severity repeated problem to an incident after five close tickets', async () => {
+  it('promotes a high-severity repeated problem to an incident after three close tickets', async () => {
     const created_at = '2026-07-12T10:00:00.000Z';
-    for (let index = 1; index <= 5; index += 1) {
+    for (let index = 1; index <= 3; index += 1) {
       insertTicket({
         id: `T-CRASH-${index}`,
         description: `Crash ${index}`,
@@ -107,7 +141,7 @@ describe('classify_ticket problem clustering', () => {
     }
 
     let latest;
-    for (let index = 1; index <= 5; index += 1) {
+    for (let index = 1; index <= 3; index += 1) {
       latest = JSON.parse(await classifyTicket({
         categories: ['bug'],
         severity: 'high',
@@ -119,11 +153,44 @@ describe('classify_ticket problem clustering', () => {
 
     expect(latest.incident).toMatchObject({
       promoted: true,
-      ticket_count: 5,
-      required_ticket_count: 5
+      ticket_count: 3,
+      required_ticket_count: 3
     });
     expect(latest.incident.incident.summary).toContain('Reason/scenario: Ultra graphics setting is enabled.');
-    expect(latest.incident.metadata.platform_counts).toEqual([{ value: 'PC', count: 5 }]);
+    expect(latest.incident.metadata.platform_counts).toEqual([{ value: 'PC', count: 3 }]);
+  });
+
+  it.each([
+    ['critical', 2],
+    ['high', 3],
+    ['medium', 4],
+    ['low', 5]
+  ])('promotes %s severity repeated problems after %i matching tickets', async (severity, threshold) => {
+    for (let index = 1; index <= threshold; index += 1) {
+      insertTicket({
+        id: `T-${severity}-${index}`,
+        description: `${severity} repeated issue ${index}`,
+        status: 'pending',
+        created_at: '2026-07-12T10:00:00.000Z'
+      });
+    }
+
+    let latest;
+    for (let index = 1; index <= threshold; index += 1) {
+      latest = JSON.parse(await classifyTicket({
+        categories: ['bug'],
+        severity,
+        rationale: `${severity} repeated test issue.`,
+        problem_summary: `${severity} test problem repeats`,
+        problem_reason: `${severity} test trigger repeats`
+      }, { ticketId: `T-${severity}-${index}` }));
+    }
+
+    expect(latest.incident).toMatchObject({
+      promoted: true,
+      ticket_count: threshold,
+      required_ticket_count: threshold
+    });
   });
 
   it('promotes based on ticket count even when matching reports are more than one day apart', async () => {
@@ -168,7 +235,7 @@ describe('classify_ticket problem clustering', () => {
     expect(latest.incident.incident.summary).toContain('Metadata: 4/5 reports on PC; all reports in NA.');
   });
 
-  it('does not promote stale clusters that only meet the count after more than two days', async () => {
+  it('does not promote stale low-severity clusters that only meet the count after more than two days', async () => {
     const createdTimes = [
       '2026-07-12T10:00:00.000Z',
       '2026-07-12T20:00:00.000Z',
@@ -189,7 +256,7 @@ describe('classify_ticket problem clustering', () => {
     for (let index = 0; index < createdTimes.length; index += 1) {
       latest = JSON.parse(await classifyTicket({
         categories: ['bug'],
-        severity: 'high',
+        severity: 'low',
         rationale: 'Astra ultimate movement lock.',
         problem_summary: 'Astra cannot move after using ultimate',
         problem_reason: 'Astra ultimate activation causes movement lock'
@@ -204,8 +271,8 @@ describe('classify_ticket problem clustering', () => {
     });
   });
 
-  it('does not promote payment problems before ten matching tickets', async () => {
-    for (let index = 1; index <= 5; index += 1) {
+  it('uses the same severity threshold for payment problems', async () => {
+    for (let index = 1; index <= 3; index += 1) {
       insertTicket({
         id: `T-PAY-${index}`,
         description: `Payment ${index}`,
@@ -215,7 +282,7 @@ describe('classify_ticket problem clustering', () => {
     }
 
     let latest;
-    for (let index = 1; index <= 5; index += 1) {
+    for (let index = 1; index <= 3; index += 1) {
       latest = JSON.parse(await classifyTicket({
         categories: ['payment'],
         severity: 'high',
@@ -226,10 +293,9 @@ describe('classify_ticket problem clustering', () => {
     }
 
     expect(latest.incident).toMatchObject({
-      promoted: false,
-      reason: 'below_threshold',
-      ticket_count: 5,
-      required_ticket_count: 10
+      promoted: true,
+      ticket_count: 3,
+      required_ticket_count: 3
     });
   });
 

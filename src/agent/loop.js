@@ -287,16 +287,21 @@ export async function runAgentLoop(sessionContext) {
       modelName = config.openaiModel;
     }
 
+    const completionBody = {
+      model: modelName,
+      messages: messages,
+      tools: openAiTools,
+      tool_choice: 'auto'
+    };
+    if (config.llmTemperature !== null) {
+      completionBody.temperature = config.llmTemperature;
+    }
+
     let response;
     try {
       response = await requestCompletion(
         url,
-        {
-          model: modelName,
-          messages: messages,
-          tools: openAiTools,
-          tool_choice: 'auto'
-        },
+        completionBody,
         {
           headers: headers,
           timeout: requestTimeout

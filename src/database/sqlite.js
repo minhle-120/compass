@@ -624,10 +624,10 @@ export function getQueueStats() {
 }
 
 const severityIncidentThresholds = {
-  critical: 3,
-  high: 5,
-  medium: 10,
-  low: 15
+  critical: 2,
+  high: 3,
+  medium: 4,
+  low: 5
 };
 
 const staleIncidentWindowMs = 48 * 60 * 60 * 1000;
@@ -708,9 +708,7 @@ function buildProblemSignature(category, problemSummary, problemReason) {
 }
 
 function incidentThresholdFor(category, severity) {
-  const base = severityIncidentThresholds[severity] || severityIncidentThresholds.medium;
-  if (String(category).toLowerCase() === 'payment') return Math.max(base, 10);
-  return base;
+  return severityIncidentThresholds[severity] || severityIncidentThresholds.medium;
 }
 
 function titleFromSummary(summary) {
@@ -900,7 +898,15 @@ function promoteEligibleProblemClusters() {
   }
 }
 
-export function clusterTicketIntoProblem(ticketId, category, severity, reason, problemSummary, problemReason) {
+export function clusterTicketIntoProblem(
+  ticketId,
+  category,
+  severity,
+  reason,
+  problemSummary,
+  problemReason,
+  { existingProblemId } = {}
+) {
   const database = getDb();
   const ticket = getTicket(ticketId);
   if (!ticket) {
@@ -936,6 +942,28 @@ export function clusterTicketIntoProblem(ticketId, category, severity, reason, p
       action: 'already_linked',
       incident: existingLink.incident_id ? promoteProblemToIncident(existingLink.id) : null
     };
+  }
+
+  const requestedExistingProblemId = Number.parseInt(existingProblemId, 10);
+  if (Number.isInteger(requestedExistingProblemId) && requestedExistingProblemId > 0) {
+    const existingProblem = database.prepare(`
+      SELECT id, category, severity, reason, status, source,
+             problem_summary, problem_reason, incident_id
+      FROM problems
+      WHERE id = ? AND status = 'open' AND lower(category) = lower(?)
+      LIMIT 1
+    `).get(requestedExistingProblemId, category);
+    if (!existingProblem) {
+      throw new Error(`Open problem "${requestedExistingProblemId}" was not found for category "${category}".`);
+    }
+
+    const now = new Date().toISOString();
+    database.prepare(`
+      INSERT INTO problem_tickets (problem_id, ticket_id, linked_at)
+      VALUES (?, ?, ?)
+    `).run(existingProblem.id, ticketId, now);
+    const incident = promoteProblemToIncident(existingProblem.id);
+    return { problem: existingProblem, action: 'added_to_existing_problem', incident };
   }
 
   const matchingProblem = database.prepare(`

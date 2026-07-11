@@ -4,7 +4,7 @@ export const schema = {
   type: 'function',
   function: {
     name: 'compare_same_type_tickets',
-    description: 'Compare the current ticket with open ticket clusters of the same category/type to determine whether the exact same problem and reason already exists.',
+    description: 'Compare the current ticket with open ticket clusters of the same category/type to determine whether the exact same problem and reason already exists. If exact_match is returned, reuse that cluster id and wording when classifying.',
     parameters: {
       type: 'object',
       properties: {
@@ -15,11 +15,11 @@ export const schema = {
         },
         problem_summary: {
           type: 'string',
-          description: 'The concise statement of what happened in the current ticket.'
+          description: 'The concise statement of what happened in the current ticket. Prefer stable wording such as "Game crashes when starting a match" over ticket-specific phrasing.'
         },
         problem_reason: {
           type: 'string',
-          description: 'The exact cause, setting, scenario, or trigger in the current ticket.'
+          description: 'The exact cause, setting, scenario, or trigger in the current ticket. Use "Unknown trigger" only when the ticket lacks enough detail to identify a cause.'
         },
         limit: {
           type: 'integer',
@@ -39,11 +39,13 @@ export async function handler(args, sessionContext) {
     throw new Error('No ticket ID is available for same-type ticket comparison.');
   }
 
-  return compareSameTypeTicketProblems(
+  const result = compareSameTypeTicketProblems(
     sessionContext.ticketId,
     args?.category,
     args?.problem_summary,
     args?.problem_reason,
     { limit: args?.limit }
   );
+  sessionContext.lastSameTypeComparison = result;
+  return result;
 }

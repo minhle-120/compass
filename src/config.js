@@ -5,6 +5,15 @@ export function resolveDraftResponseMode(value) {
   return value === 'auto_response' ? 'auto_response' : 'staff_review';
 }
 
+export function resolveOptionalTemperature(value) {
+  if (value === undefined || value === null || value === '') return null;
+  const temperature = Number(value);
+  if (!Number.isFinite(temperature) || temperature < 0 || temperature > 2) {
+    throw new TypeError('LLM_TEMPERATURE must be a number between 0 and 2 when provided.');
+  }
+  return temperature;
+}
+
 export const config = {
   // Server & Queue Database Configuration
   port: parseInt(process.env.PORT || '3000', 10),
@@ -23,6 +32,7 @@ export const config = {
 
   // LLM Orchestration Settings
   llmProvider: process.env.LLM_PROVIDER || 'openai',
+  llmTemperature: resolveOptionalTemperature(process.env.LLM_TEMPERATURE),
   contextTokenBudget: 60000,
   draftResponseMode: resolveDraftResponseMode(process.env.DRAFT_RESPONSE_MODE),
 
@@ -69,7 +79,9 @@ Your execution steps for every ticket:
 8. Classify the ticket's category and severity using "classify_ticket". The classification must include:
    - problem_summary: the exact player-facing problem, stated consistently across tickets with the same problem.
    - problem_reason: the exact cause, setting, scenario, or trigger. Same symptom with a different reason must be classified as a different problem.
-   Use the same problem_summary and problem_reason you used for compare_same_type_tickets unless the comparison result shows they should be corrected.
+   If compare_same_type_tickets returns exact_match, pass exact_match.id as existing_problem_id and reuse that exact_match problem_summary and problem_reason.
+   Use stable canonical wording instead of ticket-specific phrasing. Example: use "Game crashes when starting a match" rather than "My client crashed as soon as I queued".
+   Use "Unknown trigger" as problem_reason only when the ticket lacks enough evidence to identify a cause, setting, or scenario.
 9. Draft a response using "draft_response" when appropriate.
 10. If the information obtained from the ticket is deemed lacking, the response should ask question to gain more insight on the matter and set status to "need clarification"
 11. If the ticket description is comedic or not serious, draft a warning response and use the "resolved" outcome. Call "delete_resolved_ticket" with the current ticket ID before "idle"; deletion will occur only after the ticket is successfully finalized as resolved and after 5 minute.
