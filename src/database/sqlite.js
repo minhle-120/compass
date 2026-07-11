@@ -489,7 +489,7 @@ function parseConversation(value) {
   }
 }
 
-export function appendTicketMessage(id, sender, message) {
+export function appendTicketMessage(id, sender, message, attachments = []) {
   const database = getDb();
   return database.transaction(() => {
     const ticket = database.prepare('SELECT * FROM tickets WHERE id = ?').get(id);
@@ -500,7 +500,12 @@ export function appendTicketMessage(id, sender, message) {
     if (ticket.status !== 'running' && ticket.draft_response && ticket.draft_status !== 'pending_review') {
       conversation.push({ sender: 'agent', timestamp, message: ticket.draft_response });
     }
-    conversation.push({ sender, timestamp, message });
+    conversation.push({
+      sender,
+      timestamp,
+      message,
+      ...(Array.isArray(attachments) && attachments.length ? { attachments } : {})
+    });
 
     database.prepare(`
       UPDATE tickets

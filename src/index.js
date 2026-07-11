@@ -7,7 +7,7 @@ import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { config } from './config.js';
 import { logger } from './utils/logger.js';
 import { isValidTicketId } from './utils/ticketId.js';
-import { normalizeTicketSubmission } from './utils/ticketSubmission.js';
+import { normalizeAttachments, normalizeTicketSubmission } from './utils/ticketSubmission.js';
 import { presentTicket } from './utils/ticketPresentation.js';
 import { initDb, resetInterruptedTickets, getTicket, insertTicket, getDb, getQueueStats, appendTicketMessage, publishDraftResponse, closeTicketByUser } from './database/sqlite.js';
 import { deleteResolvedTicket, TicketDeletionError } from './services/ticketDeletion.js';
@@ -276,11 +276,13 @@ app.get('/api/tickets/:id/history', (req, res) => {
 app.post('/api/tickets/:id/messages', (req, res) => {
   try {
     const { id } = req.params;
-    const { sender, message } = req.body;
+    const { sender, message } = req.body || {};
+    const attachments = normalizeAttachments(req.body?.attachments);
+    const normalizedMessage = typeof message === 'string' ? message.trim() : '';
 
     // Validate inputs
-    if (!message || typeof message !== 'string' || !message.trim()) {
-      return res.status(400).json({ error: 'A valid string message content is required' });
+    if (!normalizedMessage && attachments.length === 0) {
+      return res.status(400).json({ error: 'A message or at least one attachment is required' });
     }
     if (sender && (typeof sender !== 'string' || !sender.trim())) {
       return res.status(400).json({ error: 'Sender must be a valid string if provided' });
@@ -302,7 +304,12 @@ app.post('/api/tickets/:id/messages', (req, res) => {
       return res.status(409).json({ error: 'This ticket is closed and cannot receive new replies.' });
     }
 
-    appendTicketMessage(id, sender || 'player', message.trim());
+    appendTicketMessage(
+      id,
+      sender || 'player',
+      normalizedMessage || 'Added attachment(s).',
+      attachments
+    );
 
     logger.info(`Received player reply for ticket ${id}. Resetting status to pending.`, 'ExpressAPI');
 
@@ -311,6 +318,9 @@ app.post('/api/tickets/:id/messages', (req, res) => {
 
     res.json({ message: 'Reply added successfully', ticketId: id });
   } catch (err) {
+    if (err instanceof TypeError) {
+      return res.status(400).json({ error: err.message });
+    }
     logger.error(`Failed to process player reply for ticket ${req.params.id}`, 'ExpressAPI', err);
     res.status(500).json({ error: 'Failed to process player reply' });
   }

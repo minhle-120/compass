@@ -208,7 +208,19 @@
         <div class="box-body">
           <form id="reply-form">
             <div class="form-group">
-              <textarea id="reply-message" class="form-control" rows="4" placeholder="Type your reply here..." required></textarea>
+              <textarea id="reply-message" class="form-control" rows="4" placeholder="Type your reply here..."></textarea>
+            </div>
+            <div class="form-group">
+              <label for="reply-attachments">Add images or videos <span style="font-weight: 400;">(optional)</span></label>
+              <span class="hint">Up to 4 JPG, PNG, WebP, MP4, WebM, or MOV files. Maximum 8 MB each.</span>
+              <input
+                type="file"
+                id="reply-attachments"
+                class="form-control"
+                accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime"
+                multiple
+              >
+              <div id="reply-attachment-preview" class="attachment-preview" aria-live="polite"></div>
             </div>
             <div style="display: flex; justify-content: flex-end; margin-top: 12px;">
               <button type="submit" id="reply-btn" class="btn btn-primary">Send Reply</button>
