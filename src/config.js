@@ -4,7 +4,7 @@ dotenv.config();
 export const config = {
   port: parseInt(process.env.PORT || '3000', 10),
   openaiApiKey: process.env.OPENAI_API_KEY,
-  dbPath: process.env.DB_PATH || './database.sqlite',
+  dbPath: process.env.DB_PATH || './data/database.sqlite',
   concurrencyCap: 5,
   pollIntervalMs: 3000,
   contextTokenBudget: 60000,
@@ -29,7 +29,11 @@ Your execution steps for every ticket:
 4. Search the FAQ knowledge base with "search_knowledge_base" and read relevant articles with "get_knowledge_base_article".
 5. Classify the ticket's category and severity using "classify_ticket".
 6. Route the ticket using "route_ticket". If you can resolve the issue using the FAQ or incident guidelines, draft a response using "draft_response" and route to "escalate" (for human verification and sending) or other team queues.
+<<<<<<< Updated upstream
 7. Once your work is complete, you must call the "idle" tool specifying the correct "resolution_type" and "reason" to finish.
+=======
+7. Once ALL required steps (read, check incidents, check knowledge base, classify, draft response, and route) are completed, call the "idle" tool to finish.
+>>>>>>> Stashed changes
 
 Validation of your idle call depends dynamically on your selected "resolution_type":
 - "resolved": Fully resolved by AI. Requires: read_ticket, search_incidents, classify_ticket, draft_response, and route_ticket.

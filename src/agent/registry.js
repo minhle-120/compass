@@ -19,8 +19,7 @@ function register(name, schema, handler) {
 try {
   const files = readdirSync(toolsDir);
   for (const file of files) {
-    // Exclude test files, dotfiles, and directories
-    if (file.endsWith('.js') && !file.includes('.test.js')) {
+    if (file.endsWith('.js')) {
       const filePath = join(toolsDir, file);
       
       // Dynamic import in ESM
@@ -69,6 +68,8 @@ export async function executeTool(name, args, sessionContext) {
     sessionContext.flags.wasResponseDrafted = true;
   } else if (name === 'search_incidents' || name === 'get_incident_details') {
     sessionContext.flags.wasIncidentsChecked = true;
+  } else if (name === 'search_knowledge_base' || name === 'get_knowledge_base_article') {
+    sessionContext.flags.wasKnowledgeBaseChecked = true;
   } else if (name === 'route_ticket') {
     sessionContext.flags.wasRouted = true;
     sessionContext.routingDestination = args.destination;
@@ -78,6 +79,7 @@ export async function executeTool(name, args, sessionContext) {
   if (name === 'idle') {
     const resolutionType = args.resolution_type;
     const missing = [];
+<<<<<<< Updated upstream
 
     // All outcomes require the ticket to be read first
     if (!sessionContext.flags.wasTicketRead) {
@@ -101,6 +103,14 @@ export async function executeTool(name, args, sessionContext) {
     } else {
       missing.push('valid resolution_type (resolved, needs_clarification, escalated, or rejected)');
     }
+=======
+    if (!sessionContext.flags.wasTicketRead) missing.push('read_ticket');
+    if (!sessionContext.flags.wasIncidentsChecked) missing.push('search_incidents or get_incident_details');
+    if (!sessionContext.flags.wasKnowledgeBaseChecked) missing.push('search_knowledge_base or get_knowledge_base_article');
+    if (!sessionContext.flags.wasClassified) missing.push('classify_ticket');
+    if (!sessionContext.flags.wasResponseDrafted) missing.push('draft_response');
+    if (!sessionContext.flags.wasRouted) missing.push('route_ticket');
+>>>>>>> Stashed changes
 
     if (missing.length > 0) {
       const errorMsg = `Validation failed! For resolution_type "${resolutionType}", you are missing required steps: ${missing.join(', ')}.`;

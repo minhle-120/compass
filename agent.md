@@ -1,9 +1,10 @@
-# Compass AI Game Support Agent - Agent Guide
+# Compass AI Game Support Agent
 
-Welcome, Agent! This document outlines the system architecture, file structure, execution flow, and development guidelines for the **Compass Support Agent** project. Use this guide to quickly understand the codebase and learn how to extend it.
+Compass is a tool-driven game support agent. The Express server accepts tickets, a worker pool assigns pending tickets, and each worker runs an LLM tool-call loop until the `idle` tool validates completion.
 
----
+## Project Structure
 
+<<<<<<< Updated upstream
 ## 1. System Architecture
 
 Compass utilizes a **Circular Agent** pattern. The AI agent communicates exclusively via tool calls and does not send plain text replies directly to players. The codebase is divided into two distinct levels to ensure crash resilience, concurrency, and modularity.
@@ -92,82 +93,64 @@ compass/
     │
     └── utils/
         └── logger.js          # Color-coded console logger printing thread IDs
+=======
+```text
+compass/
+|-- data/                  # Generated SQLite databases (gitignored)
+|-- public/                # Browser dashboard
+|   |-- css/
+|   |-- js/
+|   `-- index.html
+|-- resources/
+|   |-- source/            # Original import source files
+|   `-- sql/               # Database schemas and seed data
+|-- scripts/               # Database initialization/import commands
+|-- src/
+|   |-- agent/             # LLM execution loop and tool registry
+|   |-- database/          # Main SQLite adapter
+|   |-- tools/             # Tool schemas and handlers
+|   |-- utils/             # Shared utilities
+|   |-- worker/            # Worker pool and thread entry point
+|   |-- config.js          # Environment configuration and system prompt
+|   `-- index.js           # Express application entry point
+|-- .env.example
+|-- package.json
+`-- agent.md
+>>>>>>> Stashed changes
 ```
 
----
+## Runtime Flow
 
-## 3. Key Agent Design Patterns
+1. The Express API stores a new ticket in `data/database.sqlite`.
+2. The worker pool claims the oldest pending ticket.
+3. A worker starts the tool-call loop for that ticket.
+4. Tools read ticket, incident, knowledge-base, and slang data.
+5. The `idle` tool checks that all required work is complete.
+6. The ticket is marked completed or escalated.
 
-If you are modifying the core agent logic, pay close attention to these patterns:
+## Database Files
 
-### 3.1 Context Token Safety Valve
-To prevent runaway model completions and save budget, `loop.js` tracks cumulative token usage. 
-* It extracts **`response.data.usage.total_tokens`** from the OpenAI-compatible completions API response.
-* If the token count exceeds the `contextTokenBudget` (60,000 tokens), it exits the loop immediately, updates the status in SQLite to `escalated` (reason: `Context token limit reached`), and logs the event.
+- `data/database.sqlite`: ticket queue, incidents, knowledge-base articles, and local slang terms.
+- `data/Game Knowledge Base.sqlite`: Valorant terminology and game mechanics.
+- `data/slang.sqlite`: imported Gen-Z slang dataset.
+- `data/tickets.sqlite`: standalone ticket records.
+- `data/incidents.sqlite`: standalone incident records.
 
-### 3.2 Selective Tail Validation
-If a thread crashes mid-turn, the history file (`src/data/history/{ticketId}.json`) might contain an assistant message listing `tool_calls` without matching `tool` results.
-* On thread startup, `loop.js` inspects the tail of the conversation history. If it finds a dangling assistant turn, it pops/prunes it to restore a valid conversation state before requesting completions.
+Database locations can be overridden with `DB_PATH`, `GAME_KNOWLEDGE_DB_PATH`, and `SLANG_DB_PATH`.
 
-### 3.3 Dynamic Tool Registration (Plugin System)
-`src/agent/registry.js` uses dynamic ESM imports:
-* It reads `src/tools/` for any `.js` file (excluding tests).
-* It performs `await import("file://...")`.
-* If the module exports `schema` and `handler`, it auto-registers it using the name defined in the schema.
-* To add a tool, simply create a file in `src/tools/` exporting these properties. No static imports are needed.
+## Commands
 
-### 3.4 Local In-Worker Validation (The `idle` Contract)
-When the model invokes the `idle` tool:
-1. `registry.js` intercepts it and checks `sessionContext.flags`.
-2. It verifies that `wasTicketRead`, `wasIncidentsChecked`, `wasClassified`, `wasResponseDrafted`, and `wasRouted` are all `true`.
-3. If any checks fail, it blocks the idle execution and returns a detailed validation error message back to the LLM (e.g., `Validation failed! You are missing required steps: classify_ticket.`). This forces the model to correct its course and execute the missing tool.
-
----
-
-## 4. Multi-Provider (OpenAI & Llama.cpp)
-
-The system supports switching between standard OpenAI API and a local model running on `llama.cpp`'s server. Change this in the `.env` file:
-
-* **OpenAI mode**: Resolves `https://api.openai.com/v1/chat/completions` using the `OPENAI_API_KEY` header.
-* **Llama.cpp mode**: Resolves `${LLAMACPP_URL}/v1/chat/completions` (default `http://localhost:8080`), uses longer request timeouts (120 seconds) for slow local hardware, and does not require an API key to run.
-
----
-
-## 5. Development & Running Tests
-
-### Install dependencies
-```bash
-npm install
+```powershell
+npm.cmd install
+npm.cmd run db:init
+npm.cmd run db:init:slang
+npm.cmd run db:init:tickets
+npm.cmd run db:init:incidents
+npm.cmd start
 ```
 
-### Running unit tests (Vitest)
-Unit tests are configured to run sequentially (`fileParallelism: false`) to avoid collisions on the shared `:memory:` database instance.
-```bash
-npm test
-```
+`db:init` creates and seeds the Valorant knowledge database. `db:init:slang` downloads and imports `MLBtrio/genz-slang-dataset`. The ticket and incident commands create their respective standalone databases.
 
-### Extending with new tools
-To create a new tool, create `src/tools/{tool_name}.js` with this structure:
-```javascript
-export const schema = {
-  type: 'function',
-  function: {
-    name: 'tool_name',
-    description: 'Describe the tool and its parameters here.',
-    parameters: {
-      type: 'object',
-      properties: {
-        param1: { type: 'string', description: 'Parameter description' }
-      },
-      required: ['param1']
-    }
-  }
-};
+## Adding Tools
 
-export async function handler(args, sessionContext) {
-  const { param1 } = args;
-  // Implement logic (e.g. query database service)
-  return `Processed tool with ${param1}`;
-}
-```
-If you want to write a test, create `src/tools/__tests__/{tool_name}.test.js` using Vitest syntax.
+Add a JavaScript file to `src/tools/` that exports an OpenAI-compatible `schema` and an async `handler(args, sessionContext)`. The registry discovers it automatically at startup.

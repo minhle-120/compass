@@ -22,6 +22,7 @@ async function start() {
       wasClassified: false,
       wasResponseDrafted: false,
       wasIncidentsChecked: false,
+      wasKnowledgeBaseChecked: false,
       wasRouted: false
     }
   };

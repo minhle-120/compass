@@ -6,16 +6,16 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "db:init": "node scripts/run-sql.js resources/sql/001_game_knowledge_base_schema.sql resources/sql/002_seed_valorant_terminology.sql",
+    "db:seed:valorant": "node scripts/run-sql.js resources/sql/001_game_knowledge_base_schema.sql resources/sql/002_seed_valorant_terminology.sql",
+    "db:init:slang": "node scripts/import-genz-slang.js",
+    "db:init:tickets": "node scripts/run-sql.js --db ./data/tickets.sqlite resources/sql/003_ticket_database_schema.sql",
+    "db:init:incidents": "node scripts/run-sql.js --db ./data/incidents.sqlite resources/sql/004_incident_database_schema.sql"
   },
   "dependencies": {
     "axios": "1.18.1",
     "better-sqlite3": "12.11.1",
     "dotenv": "17.4.2",
     "express": "5.2.1"
-  },
-  "devDependencies": {
-    "vitest": "4.1.10"
   }
 }
