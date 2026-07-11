@@ -205,12 +205,24 @@ export function finalizeTicket(id, status, resolutionType, resolutionReason) {
 export function appendTicketMessage(id, sender, message) {
   const database = getDb();
   const append = database.transaction(() => {
-    const ticket = database.prepare('SELECT conversation FROM tickets WHERE id = ?').get(id);
+    const ticket = database.prepare(`
+      SELECT status, conversation, draft_response, updated_at
+      FROM tickets
+      WHERE id = ?
+    `).get(id);
     if (!ticket) return null;
 
     let conversation = [];
     if (ticket.conversation) {
       try { conversation = JSON.parse(ticket.conversation); } catch { conversation = []; }
+    }
+    const draftWasVisible = ticket.status !== 'pending' && ticket.status !== 'running';
+    if (sender === 'player' && draftWasVisible && ticket.draft_response) {
+      conversation.push({
+        sender: 'agent',
+        timestamp: ticket.updated_at || new Date().toISOString(),
+        message: ticket.draft_response
+      });
     }
     conversation.push({ sender, timestamp: new Date().toISOString(), message });
 
@@ -218,6 +230,7 @@ export function appendTicketMessage(id, sender, message) {
     database.prepare(`
       UPDATE tickets
       SET conversation = ?, status = 'pending', workflow_revision = workflow_revision + 1,
+          draft_response = NULL, resolution_type = NULL, resolution_reason = NULL,
           updated_at = ?
       WHERE id = ?
     `).run(JSON.stringify(conversation), now, id);

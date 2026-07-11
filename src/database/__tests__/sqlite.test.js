@@ -168,6 +168,37 @@ describe('SQLite Database Queue Layer', () => {
     expect(ticket.resolution_type).toBeNull();
   });
 
+  it('should archive the previous agent response before appending a player update', () => {
+    insertTicket({ id: 'T-CONVERSATION', status: 'completed', conversation: [] });
+    updateTicketDraft('T-CONVERSATION', 'Previous support response');
+
+    appendTicketMessage('T-CONVERSATION', 'player', 'I still need help');
+
+    expect(getTicket('T-CONVERSATION')).toMatchObject({
+      status: 'pending',
+      draft_response: null,
+      conversation: [
+        expect.objectContaining({ sender: 'agent', message: 'Previous support response' }),
+        expect.objectContaining({ sender: 'player', message: 'I still need help' })
+      ]
+    });
+  });
+
+  it('should not expose an unfinished draft when a player replies during processing', () => {
+    insertTicket({ id: 'T-IN-PROGRESS', status: 'running', conversation: [] });
+    updateTicketDraft('T-IN-PROGRESS', 'Unfinished internal draft');
+
+    appendTicketMessage('T-IN-PROGRESS', 'player', 'Additional detail');
+
+    expect(getTicket('T-IN-PROGRESS')).toMatchObject({
+      status: 'pending',
+      draft_response: null,
+      conversation: [
+        expect.objectContaining({ sender: 'player', message: 'Additional detail' })
+      ]
+    });
+  });
+
   it('should finalize status and resolution atomically for a running ticket', () => {
     insertTicket({ id: 'T-FINALIZE', status: 'running' });
 
