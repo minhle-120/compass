@@ -2,12 +2,23 @@
 import express from 'express';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 
 import { config } from './config.js';
 import { logger } from './utils/logger.js';
 import { initDb, resetInterruptedTickets, getTicket, insertTicket, getDb, getQueueStats } from './database/sqlite.js';
 import { pool } from './worker/pool.js';
+import {
+  WikiValidationError,
+  createWikiEntry,
+  deleteWikiEntry,
+  getWikiEntry,
+  getWikiStats,
+  initWikiDb,
+  listWikiEntries,
+  updateWikiEntry
+} from '../services/wiki/wikiService.js';
+import { startWikiSync } from '../services/wiki/sync.js';
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -16,6 +27,8 @@ const __dirname = dirname(__filename);
 // Initialize DB schema and reset interrupted tickets
 initDb();
 resetInterruptedTickets();
+initWikiDb();
+startWikiSync();
 
 // Start worker thread pool
 pool.start();
@@ -25,6 +38,70 @@ app.use(express.json());
 
 // Serve static assets from public folder
 app.use(express.static(join(__dirname, '../public')));
+
+app.get('/wiki', (req, res) => {
+  res.sendFile(join(__dirname, '../public/wiki.html'));
+});
+
+app.get('/api/wiki', (req, res) => {
+  try {
+    res.json(listWikiEntries({
+      query: req.query.query || '',
+      category: req.query.category || '',
+      limit: req.query.limit,
+      offset: req.query.offset
+    }));
+  } catch (error) {
+    sendWikiError(res, error, 'list wiki entries');
+  }
+});
+
+app.get('/api/wiki/stats', (req, res) => {
+  try {
+    res.json(getWikiStats());
+  } catch (error) {
+    sendWikiError(res, error, 'retrieve wiki statistics');
+  }
+});
+
+app.get('/api/wiki/:id', (req, res) => {
+  try {
+    const entry = getWikiEntry(req.params.id);
+    if (!entry) return res.status(404).json({ error: 'Wiki entry not found.' });
+    res.json(entry);
+  } catch (error) {
+    sendWikiError(res, error, 'retrieve wiki entry');
+  }
+});
+
+app.post('/api/wiki', (req, res) => {
+  try {
+    res.status(201).json(createWikiEntry(req.body));
+  } catch (error) {
+    sendWikiError(res, error, 'create wiki entry');
+  }
+});
+
+app.put('/api/wiki/:id', (req, res) => {
+  try {
+    const entry = updateWikiEntry(req.params.id, req.body);
+    if (!entry) return res.status(404).json({ error: 'Wiki entry not found.' });
+    res.json(entry);
+  } catch (error) {
+    sendWikiError(res, error, 'update wiki entry');
+  }
+});
+
+app.delete('/api/wiki/:id', (req, res) => {
+  try {
+    if (!deleteWikiEntry(req.params.id)) {
+      return res.status(404).json({ error: 'Wiki entry not found.' });
+    }
+    res.status(204).end();
+  } catch (error) {
+    sendWikiError(res, error, 'delete wiki entry');
+  }
+});
 
 // API Endpoint to fetch status of all tickets
 app.get('/api/tickets', (req, res) => {
@@ -204,6 +281,18 @@ app.post('/api/tickets', (req, res) => {
     res.status(500).json({ error: 'Failed to queue ticket' });
   }
 });
+
+function sendWikiError(res, error, action) {
+  if (error instanceof WikiValidationError) {
+    return res.status(400).json({ error: error.message });
+  }
+  if (error?.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+    return res.status(409).json({ error: 'A wiki entry with that term already exists.' });
+  }
+
+  logger.error(`Failed to ${action}`, 'WikiAPI', error);
+  return res.status(500).json({ error: `Failed to ${action}.` });
+}
 
 
 // Start Express server

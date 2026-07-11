@@ -1,0 +1,488 @@
+{
+  "schema_version": 1,
+  "source": "https://valorant.fandom.com/wiki/Terminology",
+  "retrieved_at": "2026-07-11",
+  "entry_count": 120,
+  "entries": [
+    {
+      "term": "(Damage dealt) (Agent Name)",
+      "explanation": "Usually said after you damage an enemy but they kill you first. It's to give your team the heads-up that you did damage to an agent. Example: \"120 Jett\""
+    },
+    {
+      "term": "Accessories",
+      "explanation": "An umbrella term for cosmetic types that covers player cards, sprays, buddies, and player titles."
+    },
+    {
+      "term": "Ace",
+      "explanation": "A type of round outcome where one player on the winning team killed each enemy player at least once. Often synonymous with a pentakill."
+    },
+    {
+      "term": "ADS",
+      "explanation": "Meaning \"Aiming Down Sights\", referring to when you use Alternate Fire on a weapon to directly look down the gun's sights. This zooms in slightly and can reduce spread and recoil, though often at the cost of reduced fire rate."
+    },
+    {
+      "term": "Anchor",
+      "explanation": "To play on a site as a defender so as to stall a push by the attackers, to buy time to allow teammates to rotate to the site to help defend."
+    },
+    {
+      "term": "Angle advantage",
+      "explanation": "A player further away from an angle has better angle advantage than someone closer to it on the opposite side due to the closer player's model becoming visible as they peek before they are able to see the further player's model themselves."
+    },
+    {
+      "term": "Angles",
+      "explanation": "A corner of the map where a player who wants to move past has to risk putting themselves in danger in case an enemy is around the corner and waiting to get a kill before the player can stop moving and fire back."
+    },
+    {
+      "term": "Anti-eco",
+      "explanation": "Refers to buying weapons to try to keep an economic lead over a team that is resorting to saving creds in an eco-round. Typically avoiding weapons that avoid close quarters combat since a team that is having an eco-round will have to resort to cheaper, close range weapons such as shotguns, SMGs and pistols."
+    },
+    {
+      "term": "Anti-flash",
+      "explanation": "A tactic that has a player take cover from where they expect an enemy to use a flash, then swing out after it is detonated to take out any enemies attempting to play off of the flash."
+    },
+    {
+      "term": "Armory",
+      "explanation": "The menu where players buy their guns, abilities, and shields"
+    },
+    {
+      "term": "Back/Back site",
+      "explanation": "The parts of a spike site that are closest to Defender Spawn or the furthest parts of a site from an attacker's perspective."
+    },
+    {
+      "term": "Baiting",
+      "explanation": "Allowing a teammate to enter a entry-frag without the intent to trade for them in the event that they are killed by an opponent. This usually wastes the entry-fragger's utility and info gained as the opponent can reposition/ recover without being punished/refragged/traded, thus leaving the team at a disadvantage."
+    },
+    {
+      "term": "Baiting Utility",
+      "explanation": "Forcing opponents to use their abilities in order to get an advantage."
+    },
+    {
+      "term": "Bottom frag",
+      "explanation": "The player with the least amount of kills on a team or for the match."
+    },
+    {
+      "term": "Bunnyhop/B-Hop",
+      "explanation": "An advanced technique that allows you to mix up your movement and move slightly faster than sprinting by timing your jumps and air strafing."
+    },
+    {
+      "term": "Callout",
+      "explanation": "Refers to indicating a place on a map by a particular name, such as “Heaven”, or “Elbow”."
+    },
+    {
+      "term": "Camp",
+      "explanation": "To defensively hold an area, usually a close angle, for a long time for an enemy to move past rather than seeking them out."
+    },
+    {
+      "term": "Clearing angles",
+      "explanation": "To check whether an opponent is around the corner or in a particular corner."
+    },
+    {
+      "term": "Clearing site",
+      "explanation": "When the attackers thoroughly check the site before planting the spike to decrease the chance of a hidden defender sneaking upon them."
+    },
+    {
+      "term": "Clone",
+      "explanation": "Usually referred to Yoru's Fakeout."
+    },
+    {
+      "term": "Clutch",
+      "explanation": "A type of round outcome where the round was won by the last player alive on the team."
+    },
+    {
+      "term": "Collateral",
+      "explanation": "Killing more than one enemy with a single bullet. Mostly associated with high damage semi-automatic weapons e.g Sheriff, Operator."
+    },
+    {
+      "term": "Counterstrafe",
+      "explanation": "An movement technique that allows you to shoot accurately if you simultaneously fire when you strafe in the opposite direction. This is achieved by firing at the moment the player has decelerated to a standstill before their movement switches to the opposite direction."
+    },
+    {
+      "term": "Crossfire",
+      "explanation": "When two teammates position and fire so they are on opposite sides of an enemy between them."
+    },
+    {
+      "term": "Crosshair placement",
+      "explanation": "Where a player positions their crosshair as they move across the map or hold angles. Good crosshair placement keeps it in the most likely position that an opponent's head will appear in so that they can be shot and killed in as little time as possible."
+    },
+    {
+      "term": "Crouch Spraying",
+      "explanation": "An act of peeking out, and immediately crouching and spraying down the enemy."
+    },
+    {
+      "term": "CT",
+      "explanation": "Meaning \"Counter Terrorists\", an equivalent to VALORANT defenders brought over by Counter Strike: Global Offensive players."
+    },
+    {
+      "term": "Cubby",
+      "explanation": "A deep corner or recessed section of a passageway that players can hide in and peek from."
+    },
+    {
+      "term": "Default",
+      "explanation": "When you're on the attacking side and your team plays a neutral/non-committal strategy to gain information and/or look for picks."
+    },
+    {
+      "term": "Default Plant",
+      "explanation": "The most common location on site where the spike is planted."
+    },
+    {
+      "term": "Dink",
+      "explanation": "Refers to a headshot that doesn’t kill an enemy, usually used to indicate that the target is close to dying."
+    },
+    {
+      "term": "Dog",
+      "explanation": "Usually referred to Skye's Trailblazer or Fade's Prowler (despite the fact that both of their abilities belong in the cat category)."
+    },
+    {
+      "term": "Double Swing",
+      "explanation": "Two players swinging at once in order to overwhelm an opponent and force them to decide which player to shoot at usually ending in a trade."
+    },
+    {
+      "term": "Dry Peek",
+      "explanation": "Peeking an angle without using any abilities."
+    },
+    {
+      "term": "Eco/eco round",
+      "explanation": "When a team chooses to save credits in order to have the ability to full buy during the following round and to destabilize the opponents' economy."
+    },
+    {
+      "term": "Elbow",
+      "explanation": "A tight location on a map that contains two or three 90-degree angles."
+    },
+    {
+      "term": "Entry fragger",
+      "explanation": "The player or agent who looks to initiate the fight when attacking by entering first and getting the opening kill and gaining information about the opponent's positions."
+    },
+    {
+      "term": "Exit frag",
+      "explanation": "Before a bomb detonates, players will often run away so they can survive and save their guns. Looking for exit frags means to position yourself so you can kill these players rather than trying to defuse."
+    },
+    {
+      "term": "Fake Clone",
+      "explanation": "When a Yoru tries to fool the enemy team into thinking they are a Fakeout clone when they are not. High Risk, high reward if done correctly."
+    },
+    {
+      "term": "Fake Defuse",
+      "explanation": "Pretending to defuse the spike in order to force the attackers to peek to attempt to defend the spike from being defused."
+    },
+    {
+      "term": "Faking",
+      "explanation": "Pretending to attack a site in order to force defenders to rotate away from other sites allowing attackers to easily take the undefended site."
+    },
+    {
+      "term": "Flank",
+      "explanation": "When a player sneaks around to attack the enemy team from behind."
+    },
+    {
+      "term": "Flawless",
+      "explanation": "A type of round outcome where no one on the winning team died."
+    },
+    {
+      "term": "Flick",
+      "explanation": "To quickly move your crosshair and shoot, usually made in instant response to spotting an enemy whose position isn't currently that close to where your crosshair is positioned."
+    },
+    {
+      "term": "Force buy",
+      "explanation": "Buying the best possible weapons while lacking enough creds for a full-buy to hold onto a lead, the half is close to ending, gain an economic advantage or to increase the odds of winning a round to stave off a loss when the opponents are close to victory."
+    },
+    {
+      "term": "Frag",
+      "explanation": "Alternative term for a kill."
+    },
+    {
+      "term": "Full-buy",
+      "explanation": "When your team is able to buy to be fully equipped. Usually a combination of heavy shields and a rifle."
+    },
+    {
+      "term": "Game sense",
+      "explanation": "A player's intuitive ability to predict the positions and actions of opponents given the current gamestate."
+    },
+    {
+      "term": "Half-buy",
+      "explanation": "Buying the best equipment possible while maintaining enough creds to full-buy in the next round."
+    },
+    {
+      "term": "Heaven",
+      "explanation": "A high location from which snipers and other long-ranged weapons are usually used."
+    },
+    {
+      "term": "Hell",
+      "explanation": "A low location underneath another part of the map, usually below places regarded as \"Heaven\"."
+    },
+    {
+      "term": "Hip Fire",
+      "explanation": "Firing from the hip, or without using ADS."
+    },
+    {
+      "term": "Holding angles",
+      "explanation": "When a player watches and aims at a corner of the map in anticipation of any enemies who want to peek around it."
+    },
+    {
+      "term": "IGL",
+      "explanation": "Shorthand for \"In-Game Leader\". Like the captain of the team: prepares strategies during Buy Phase and initiate callouts during Round Phase."
+    },
+    {
+      "term": "Instalock",
+      "explanation": "When an ally immediately selects and locks in their agent choice when they enter agent select. Often associated with players who pick Duelists due to their popularity."
+    },
+    {
+      "term": "Jiggle peek",
+      "explanation": "To quickly peek out and return to cover to gain information or to bait an enemy into shooting at you, giving up their location."
+    },
+    {
+      "term": "Jump peek",
+      "explanation": "To quickly peek out by jumping out of cover and then flicking back to cover to gain info. This catches the enemy by surprise and usually can't react in time to shoot you."
+    },
+    {
+      "term": "Lineup",
+      "explanation": "A particular positioning set up to guarantee that your ability lands in a certain way, mostly used for abilities with an arcing projectile such as Sova's Recon, Brimstone's Incendiary and Shock bolts or Viper's Snake Bite. These work by aligning the player's HUD elements, such as the crosshair or ability icons, with specific features on the map."
+    },
+    {
+      "term": "Link",
+      "explanation": "A short passageway that serves as a connector between two large sections of the map, such as 'Mid to B Defender Side' or 'B Site to C Site'."
+    },
+    {
+      "term": "Lit",
+      "explanation": "Often used to describe when an enemy has taken a lot of damage and is close to dying."
+    },
+    {
+      "term": "Lobby",
+      "explanation": "A generic quadrilateral area close to the Attacker Spawn, often used when the area doesn't have distinguishable features to give it a more specific callout."
+    },
+    {
+      "term": "Long",
+      "explanation": "A long passageway/pathway or the longer of two pathways leading from the attacker side of the map to the site."
+    },
+    {
+      "term": "Lurk",
+      "explanation": "To position and look out to catch flankers."
+    },
+    {
+      "term": "Main",
+      "explanation": "A section of neutral ground situated between a spike site and Attacker Spawn, kept out of bounds behind the barriers before a round starts."
+    },
+    {
+      "term": "MB",
+      "explanation": "Shorthand for \"My bad\". Usually said when someone screws up or messes up on something."
+    },
+    {
+      "term": "Mid",
+      "explanation": "The middle section of the map."
+    },
+    {
+      "term": "Molly",
+      "explanation": "Usually referred to Brimstone's Incendiary, or as shorthand for any other molotov ability that causes area denial."
+    },
+    {
+      "term": "Ninja defuse",
+      "explanation": "When a defender sneaks past attackers and defuses the spike without the attackers noticing usually by initiating the defuse when a louder audio cue is playing which can mask the sound of initiating the defuse."
+    },
+    {
+      "term": "NT",
+      "explanation": "Meaning \"Nice Try\", It refers to by players after someone in their team comes closer to clutching up on a round, but fails at the end."
+    },
+    {
+      "term": "Off-angle",
+      "explanation": "An uncommon and therefore unexpected position from where a player can hold an angle to surprise opponents and reduce the effectiveness of their crosshair positioning and forcing them to utilize more skill and aim intensive flicking to attempt to quickly and accurately shoot at the player."
+    },
+    {
+      "term": "One-tap",
+      "explanation": "To headshot kill with one shot, with weapons such as a Sheriff, Vandal, or Guardian."
+    },
+    {
+      "term": "One-way",
+      "explanation": "A smoke that allows a player to see enemies but the enemies cannot see them due to the difference in the distance between the player and the opponents from the smoke."
+    },
+    {
+      "term": "OP (initials)",
+      "explanation": "Shorthand for \"overpowered\", used to refer to to an ability or agent who is currently very powerful and regarded as busted."
+    },
+    {
+      "term": "OP (word)",
+      "explanation": "Shorthand for the Operator, used due to its similar sound to the \"AWP\", the Operator's Counter Strike: Global Offensive counterpart, when spoken as a whole word instead of as an acronym. Can also refer to Chamber's Tour De Force due to the similarities between the weapons."
+    },
+    {
+      "term": "Orbs",
+      "explanation": "Spherical objects that can be picked up after a short channel time to charge a point in your Ultimate ability in standard gameplay or equip the player with a buff in Spike Rush."
+    },
+    {
+      "term": "Peek",
+      "explanation": "To poke out of cover to look for enemies."
+    },
+    {
+      "term": "Peeker's Advantage",
+      "explanation": "Due to technical lag time from the game, an aggressive peeker will see an enemy behind cover slightly before the enemy sees them."
+    },
+    {
+      "term": "Penned",
+      "explanation": "Short for \"penetrated\", see \"Wallbang\""
+    },
+    {
+      "term": "Pick",
+      "explanation": "To safely get a kill on an isolated enemy."
+    },
+    {
+      "term": "Pistol Round",
+      "explanation": "The first round of each half where all players only have enough credits to purchase Sidearm guns."
+    },
+    {
+      "term": "Plant for “____”",
+      "explanation": "Refers to planting the spike in a particular location such that it is visible from and can be defended from the aforementioned location."
+    },
+    {
+      "term": "Play for picks",
+      "explanation": "To play passively and wait to punish enemies that push out aggressively."
+    },
+    {
+      "term": "Play slow",
+      "explanation": "To play passively and use time to find information regarding enemy positions instead of looking to make aggressive plays."
+    },
+    {
+      "term": "Playing for time",
+      "explanation": "Playing safely in order to not die, and waste time in order to fulfill the win condition."
+    },
+    {
+      "term": "Pocket Guardian",
+      "explanation": "Usually refers to Chamber's Headhunter. But sometimes referred to as a Sheriff."
+    },
+    {
+      "term": "Poppin' Swing",
+      "explanation": "An act of holding down one movement key to move in one direction to throw off the enemy's aim."
+    },
+    {
+      "term": "Post Plant",
+      "explanation": "The period of time after the spike has been planted."
+    },
+    {
+      "term": "Pre-fire",
+      "explanation": "To preemptively fire at an area or angle that enemies are often at. This can allow you to get the jump on an enemy without having to rely on your reaction time to fire at them."
+    },
+    {
+      "term": "Rat",
+      "explanation": "Might imply that the player is playing too passively, hiding more than engaging in fights, or using tactics deemed \"cheap\" or \"unfair\" by the accusing player. Or it means that the player is being clever or unpredictable."
+    },
+    {
+      "term": "Refrag",
+      "explanation": "See \"Trade\""
+    },
+    {
+      "term": "Remake",
+      "explanation": "A surrender due to unfair circumstances towards the team with disconnected or missing player(s) on Round 1. Automatically initiates when the missing player does not return in round 2. Prior to patch v10.06, the team (excluding parties of five) can initiate a remake by typing /remake in chat on Round 2 to vote. This does not affect any MMR gains or losses for affected players in the lobby."
+    },
+    {
+      "term": "Res/Rez",
+      "explanation": "Short for \"Resurrection,\" used in reference to Sage's ultimate ability Resurrection."
+    },
+    {
+      "term": "Retake",
+      "explanation": "When the defenders concede a site to the attackers in order to regroup and coordinate to regain control of the site."
+    },
+    {
+      "term": "Roomba",
+      "explanation": "Alternative name for Raze's Boom Bot."
+    },
+    {
+      "term": "Rotate",
+      "explanation": "When a player or team commits to traveling to another location on the map, usually to another site."
+    },
+    {
+      "term": "Run & Gun",
+      "explanation": "An act of shooting your gun while moving. It's very inaccurate, and usually done so when an enemy is close to you and standing still isn't viable. Run & Gun can be done with any gun depending on the situation."
+    },
+    {
+      "term": "Rush",
+      "explanation": "When the attackers try to overwhelm the defenders with speed and superior numbers by quickly running onto site before the defenders can react or send help."
+    },
+    {
+      "term": "Saving",
+      "explanation": "When the opponent team's victory is guaranteed for a round, and remaining teammates choose to run and hide in order to avoid losing their weapons by dying to opponents."
+    },
+    {
+      "term": "Shields",
+      "explanation": "Protective items that absorb a percentage of incoming damage"
+    },
+    {
+      "term": "Short",
+      "explanation": "A short passageway/pathway or the shorter of two pathways leading from the attacker side of the map to the site."
+    },
+    {
+      "term": "Shoulder Peek",
+      "explanation": "Peeking in order to only expose the shoulder of one's player model in order to bait an opponent in to firing to give up their position, usually done when an opponent is using an operator to force them into a state of vulnerability while they are chambering their next bullet and also putting them at a disadvantage when they are repeeking as their position is now known."
+    },
+    {
+      "term": "Spawn",
+      "explanation": "Refers to the starting location where players spawn at the beginning of a round."
+    },
+    {
+      "term": "Spike",
+      "explanation": "A bomb-like device that agents plant/defuse in order to win rounds."
+    },
+    {
+      "term": "Stack",
+      "explanation": "To have many team members attack a site or defend an area."
+    },
+    {
+      "term": "Stick",
+      "explanation": "When a player commits to defusing a spike rather than tapping it to fake out an enemy."
+    },
+    {
+      "term": "Surrender",
+      "explanation": "Initate a vote system to end the game early on a loss on applicable game modes."
+    },
+    {
+      "term": "Swing",
+      "explanation": "When you peek quickly and at a wider angle to catch an enemy holding the expected angle by surprise."
+    },
+    {
+      "term": "T",
+      "explanation": "Meaning \"Terrorists\", an equivalent to VALORANT attackers brought over by Counter Strike: Global Offensive players."
+    },
+    {
+      "term": "Tapping the Spike",
+      "explanation": "See \"Fake defuse\""
+    },
+    {
+      "term": "Team Ace",
+      "explanation": "A type of round outcome where each player on the winning team killed a different enemy player."
+    },
+    {
+      "term": "Thrifty",
+      "explanation": "A type of round outcome where the winning team won while possessing loadouts of at least an average of 2,500 less credit value than the enemy team's."
+    },
+    {
+      "term": "Top frag",
+      "explanation": "The player with the most kills on a team or for the match."
+    },
+    {
+      "term": "TP",
+      "explanation": "Short for \"teleport\". This can either refer to an agent using a teleport ability or using one of the teleporters on Bind."
+    },
+    {
+      "term": "Tracking",
+      "explanation": "Crosshair control about keeping your crosshair on a target for an extended period of time, usually when either they or you are on the move."
+    },
+    {
+      "term": "Trade",
+      "explanation": "When a player dies but their teammate immediately kills the enemy that killed them."
+    },
+    {
+      "term": "Ult",
+      "explanation": "Shorthand for Ultimate ability."
+    },
+    {
+      "term": "Utility",
+      "explanation": "A general term used to refer to abilities. Or \"Util\" for short."
+    },
+    {
+      "term": "Wallbang",
+      "explanation": "Getting a kill by shooting through a wall or terrain."
+    },
+    {
+      "term": "Whiffing",
+      "explanation": "Missing a shot"
+    },
+    {
+      "term": "Wide peek",
+      "explanation": "See \"Swing\""
+    }
+  ]
+}

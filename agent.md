@@ -37,7 +37,8 @@ graph TD
 
 ### 1.3 Services Layer (Domain Services)
 * **Ticket Service (`services/ticket/`)**: High-level repository pattern for ticket querying. Resolves ticket information and writes outcomes back to the queue.
-* **Incident, KB, & Slang Services (`services/`)**: Isolate system incidents, knowledge base FAQs, and slang databases. These modules encapsulate their own independent data stores (e.g. JSON files or separate databases) completely detached from the core queue database.
+* **Incident Service (`services/incident/`)**: Isolates incident storage and lookup from the ticket queue.
+* **Knowledge Services (`services/wiki/`, `services/slang/`)**: Store editable game terminology in a dedicated local wiki database and query `MLBtrio/genz-slang-dataset` directly for Gen-Z slang. Source-owned wiki entries refresh every 24 hours without overwriting local edits.
 
 
 ---
@@ -50,8 +51,8 @@ compass/
 ├── vitest.config.js           # Sequential testing options (no state collisions)
 ├── .env.example               # Configuration template file
 │
-├── public/                    # Web Portal (Dashboard Interface)
-│   ├── index.html             # Sleek dark-mode dashboard HTML
+├── public/                    # Dashboard and local wiki frontends
+│   ├── index.html             # Support portal home
 │   ├── css/
 │   │   └── styles.css         # Responsive glassmorphic layout stylesheet
 │   └── js/
@@ -60,8 +61,9 @@ compass/
 ├── services/                  # Business Domain Services (Separate data stores)
 │   ├── ticket/                # Ticket reader & writer repository adapter
 │   ├── incident/              # Live incident lookup service
-│   ├── kb/                    # Knowledge base FAQ query service
-│   └── slang/                 # Slang glossary lookup & feedback service
+│   ├── http/                  # Shared remote JSON client
+│   ├── wiki/                  # Local wiki database, importer, and refresh service
+│   └── slang/                 # Direct Hugging Face dataset provider
 │
 └── src/                       # Agent Core
     ├── index.js               # Entry point & Express routes
@@ -145,6 +147,26 @@ Unit tests are configured to run sequentially (`fileParallelism: false`) to avoi
 ```bash
 npm test
 ```
+
+### Using the local wiki
+Open `http://localhost:3000/wiki` while the application is running. The editor can browse, search, add, revise, and delete terminology entries. Agent calls to `search_knowledge_base` and `get_knowledge_base_article` read from this same database.
+
+To import the bundled, versioned snapshot without making a network request:
+```bash
+npm run wiki:import
+```
+
+To download the latest agents, abilities, ultimates, maps, weapons, and terminology, update the bundled snapshots, and import them:
+```bash
+npm run wiki:refresh
+```
+
+To refresh only the structured agent, map, and weapon catalog:
+```bash
+npm run wiki:catalog
+```
+
+Entries changed in the local editor are marked as local and are not overwritten by later source refreshes.
 
 ### Extending with new tools
 To create a new tool, create `src/tools/{tool_name}.js` with this structure:

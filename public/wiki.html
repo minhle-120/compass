@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="The editable Compass game terminology wiki.">
+  <title>Field Manual | Compass Wiki</title>
+  <link rel="stylesheet" href="/css/wiki.css">
+</head>
+<body>
+  <header class="masthead">
+    <a class="masthead-brand" href="/wiki" aria-label="Compass Wiki home">
+      <span class="brand-mark">C//</span>
+      <span>
+        <strong>Field Manual</strong>
+        <small>Compass knowledge wiki</small>
+      </span>
+    </a>
+    <nav class="masthead-nav" aria-label="Primary navigation">
+      <a href="/dashboard.html">Support dashboard</a>
+      <a href="/">Compass home</a>
+    </nav>
+  </header>
+
+  <main class="wiki-layout">
+    <aside class="catalog" aria-label="Wiki entries">
+      <div class="catalog-heading">
+        <p class="kicker">Index / A-Z</p>
+        <h1>Game language,<br>plainly explained.</h1>
+      </div>
+
+      <div class="search-wrap">
+        <label for="wiki-search">Search terms and explanations</label>
+        <div class="search-control">
+          <span aria-hidden="true">/</span>
+          <input id="wiki-search" type="search" placeholder="Search the manual" autocomplete="off">
+        </div>
+      </div>
+
+      <div class="filter-wrap">
+        <label for="category-filter">Category</label>
+        <select id="category-filter">
+          <option value="">All knowledge</option>
+          <option value="agent">Agents</option>
+          <option value="ability">Abilities</option>
+          <option value="ultimate">Ultimates</option>
+          <option value="map">Maps</option>
+          <option value="weapon">Weapons</option>
+          <option value="mechanic">Mechanics</option>
+        </select>
+      </div>
+
+      <div class="catalog-actions">
+        <span id="entry-count">Loading entries...</span>
+        <button id="add-entry" class="button button-accent" type="button">+ New term</button>
+      </div>
+
+      <div id="entry-list" class="entry-list" aria-live="polite"></div>
+    </aside>
+
+    <section class="workspace">
+      <div id="welcome-state" class="welcome-state">
+        <span class="edition-stamp">LOCAL EDITION</span>
+        <p class="kicker">Compass / Reference desk</p>
+        <h2>Choose a term<br>from the index.</h2>
+        <p>This wiki is the knowledge source used by the support agent. Every entry is intentionally reduced to a term and a clear text explanation.</p>
+        <div id="wiki-stats" class="wiki-stats" aria-live="polite"></div>
+      </div>
+
+      <article id="reader-state" class="reader-state" hidden>
+        <div class="reader-toolbar">
+          <div class="entry-badges">
+            <span id="entry-category" class="origin-badge"></span>
+            <span id="entry-origin" class="origin-badge origin-muted"></span>
+          </div>
+          <div class="toolbar-actions">
+            <button id="edit-entry" class="button" type="button">Edit</button>
+            <button id="delete-entry" class="button button-danger" type="button">Delete</button>
+          </div>
+        </div>
+        <p class="kicker">Term / Definition</p>
+        <h2 id="entry-term"></h2>
+        <div class="rule" aria-hidden="true"></div>
+        <p id="entry-explanation" class="entry-explanation"></p>
+        <p id="entry-updated" class="entry-updated"></p>
+      </article>
+
+      <section id="editor-state" class="editor-state" hidden>
+        <div class="editor-heading">
+          <div>
+            <p class="kicker">Editorial desk</p>
+            <h2 id="editor-title">New term</h2>
+          </div>
+          <button id="cancel-edit" class="text-button" type="button">Cancel</button>
+        </div>
+        <form id="entry-form">
+          <label for="term-input">Term</label>
+          <input id="term-input" name="term" type="text" maxlength="160" required placeholder="e.g. Counter-strafe">
+
+          <label for="category-input">Category</label>
+          <select id="category-input" name="category" required>
+            <option value="agent">Agent</option>
+            <option value="ability">Ability</option>
+            <option value="ultimate">Ultimate</option>
+            <option value="map">Map</option>
+            <option value="weapon">Weapon</option>
+            <option value="mechanic" selected>Mechanic</option>
+          </select>
+
+          <label for="explanation-input">Explanation</label>
+          <textarea id="explanation-input" name="explanation" maxlength="10000" required placeholder="Explain the term in plain text."></textarea>
+
+          <div class="editor-footer">
+            <span id="character-count">0 / 10,000</span>
+            <button id="save-entry" class="button button-accent" type="submit">Publish entry</button>
+          </div>
+        </form>
+      </section>
+    </section>
+  </main>
+
+  <dialog id="delete-dialog">
+    <form method="dialog" class="dialog-card">
+      <p class="kicker">Permanent action</p>
+      <h2>Delete this term?</h2>
+      <p id="delete-copy">This removes the entry from the wiki and from agent search results.</p>
+      <div class="dialog-actions">
+        <button class="button" value="cancel">Keep entry</button>
+        <button id="confirm-delete" class="button button-danger" value="confirm">Delete permanently</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="/js/wiki.js" type="module"></script>
+</body>
+</html>
