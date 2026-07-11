@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, readFileSync } from 'fs';
 
 import { config } from '../../src/config.js';
 import { logger } from '../../src/utils/logger.js';
+import { normalizeUnknownWord } from '../../src/utils/unknownWord.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const snapshotPaths = [
@@ -167,6 +168,7 @@ export function flagUnknownWord(input) {
   const ticketId = optionalText(input?.ticketId, 160);
   if (!normalizedWord) throw new WikiValidationError('Unknown word is required.');
   if (word.length > 160) throw new WikiValidationError('Unknown word must be 160 characters or fewer.');
+  if (!context) throw new WikiValidationError('Context is required.');
 
   const database = initWikiDb();
   const now = new Date().toISOString();
@@ -393,14 +395,6 @@ function resolveUnknownWordByTerm(database, term, now) {
     SET status = 'resolved', resolved_at = ?
     WHERE normalized_word = ? AND status != 'resolved'
   `).run(now, normalizeUnknownWord(term));
-}
-
-function normalizeUnknownWord(value) {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/^[-'"`.,!?;:()[\]{}]+|[-'"`.,!?;:()[\]{}]+$/g, '')
-    .replace(/\s+/g, ' ');
 }
 
 function optionalText(value, maxLength) {

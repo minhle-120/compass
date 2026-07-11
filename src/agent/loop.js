@@ -5,6 +5,7 @@ import axios from 'axios';
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { assertValidTicketId } from '../utils/ticketId.js';
+import { hasExactKnowledgeMatch, normalizeUnknownWord } from '../utils/unknownWord.js';
 import { finalizeTicket } from '../database/sqlite.js';
 import { executeTool, getOpenAITools } from './registry.js';
 import { parentPort, threadId } from 'worker_threads';
@@ -116,18 +117,10 @@ function reconstructWorkflowFlags(messages, sessionContext) {
       const key = normalizeUnknownWord(call?.args?.query);
       if (key) {
         sessionContext.unknownWordChecks[key] ||= { slangMiss: false, knowledgeMiss: false };
-        sessionContext.unknownWordChecks[key].knowledgeMiss = result.output?.total_matches === 0;
+        sessionContext.unknownWordChecks[key].knowledgeMiss = !hasExactKnowledgeMatch(result.output, call?.args?.query);
       }
     }
   }
-}
-
-function normalizeUnknownWord(value) {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/^[-'"`.,!?;:()[\]{}]+|[-'"`.,!?;:()[\]{}]+$/g, '')
-    .replace(/\s+/g, ' ');
 }
 
 function normalizeToolResult(result, toolName) {

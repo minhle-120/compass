@@ -3,6 +3,7 @@ import { readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { logger } from '../utils/logger.js';
+import { hasExactKnowledgeMatch, normalizeUnknownWord } from '../utils/unknownWord.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -134,7 +135,7 @@ export async function executeTool(name, args, sessionContext) {
     } else if (name === 'search_knowledge_base') {
       const key = normalizeUnknownWord(args.query);
       const checks = getUnknownWordChecks(sessionContext, key);
-      checks.knowledgeMiss = result?.total_matches === 0;
+      checks.knowledgeMiss = !hasExactKnowledgeMatch(result, args.query);
     }
     if (name === 'read_ticket') {
       sessionContext.flags.wasTicketRead = true;
@@ -170,12 +171,4 @@ function getUnknownWordChecks(sessionContext, key) {
   sessionContext.unknownWordChecks ||= {};
   sessionContext.unknownWordChecks[key] ||= { slangMiss: false, knowledgeMiss: false };
   return sessionContext.unknownWordChecks[key];
-}
-
-function normalizeUnknownWord(value) {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/^[-'"`.,!?;:()[\]{}]+|[-'"`.,!?;:()[\]{}]+$/g, '')
-    .replace(/\s+/g, ' ');
 }

@@ -111,4 +111,9 @@ describe('Local wiki service', () => {
     expect(deleteUnknownWord(first.id)).toBe(true);
     expect(getUnknownWord(first.id)).toBeNull();
   });
+
+  it('rejects an unknown word without review context', () => {
+    expect(() => flagUnknownWord({ word: 'glorp', context: '   ' }))
+      .toThrow('Context is required.');
+  });
 });
