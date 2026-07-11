@@ -10,6 +10,10 @@ export const config = {
   contextTokenBudget: 60000,
   openaiModel: 'gpt-4o',
   historyDir: './src/data/history',
+  llmProvider: process.env.LLM_PROVIDER || 'openai',
+  llamacppUrl: process.env.LLAMACPP_URL || 'http://localhost:8080',
+  llamacppModel: process.env.LLAMACPP_MODEL || 'local-model',
+
   
   // Game Support Agent System Instructions
   systemPrompt: `

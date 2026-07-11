@@ -71,7 +71,7 @@ function saveHistory(ticketId, messages) {
  */
 export async function runAgentLoop(sessionContext) {
   const { ticketId } = sessionContext;
-  logger.info(`Entering agent loop`, `Ticket-${ticketId}`);
+  logger.info(`Entering agent loop using ${config.llmProvider.toUpperCase()} provider`, `Ticket-${ticketId}`);
   
   const messages = loadOrCreateHistory(ticketId);
   const openAiTools = getOpenAITools();
@@ -97,39 +97,57 @@ export async function runAgentLoop(sessionContext) {
       break;
     }
 
-    logger.debug(`Sending completion request to OpenAI (Previous total tokens: ${lastKnownTokenCount})`, `Ticket-${ticketId}`);
+    logger.debug(`Sending completion request (Previous total tokens: ${lastKnownTokenCount})`, `Ticket-${ticketId}`);
 
-    if (!config.openaiApiKey) {
-      throw new Error('OPENAI_API_KEY is not configured in environmental variables.');
+    // Resolve LLM Provider parameters (OpenAI vs Llama.cpp)
+    let url;
+    let headers = { 'Content-Type': 'application/json' };
+    let modelName;
+    let requestTimeout = 45000; // default 45s for cloud API
+
+    if (config.llmProvider === 'llamacpp') {
+      const baseUrl = config.llamacppUrl.replace(/\/$/, '');
+      url = `${baseUrl}/v1/chat/completions`;
+      modelName = config.llamacppModel;
+      requestTimeout = 120000; // 120s timeout for slower local generations
+      
+      // If user supplied API key in .env for local proxy, pass it, otherwise ignore
+      if (config.openaiApiKey) {
+        headers['Authorization'] = `Bearer ${config.openaiApiKey}`;
+      }
+    } else {
+      url = 'https://api.openai.com/v1/chat/completions';
+      if (!config.openaiApiKey) {
+        throw new Error('OPENAI_API_KEY is not configured in environment variables for the openai provider.');
+      }
+      headers['Authorization'] = `Bearer ${config.openaiApiKey}`;
+      modelName = config.openaiModel;
     }
 
     let response;
     try {
       response = await axios.post(
-        'https://api.openai.com/v1/chat/completions',
+        url,
         {
-          model: config.openaiModel,
+          model: modelName,
           messages: messages,
           tools: openAiTools,
           tool_choice: 'auto'
         },
         {
-          headers: {
-            'Authorization': `Bearer ${config.openaiApiKey}`,
-            'Content-Type': 'application/json'
-          },
-          timeout: 45000 // 45s API timeout
+          headers: headers,
+          timeout: requestTimeout
         }
       );
     } catch (apiErr) {
       const errorMsg = apiErr.response?.data?.error?.message || apiErr.message || String(apiErr);
-      logger.error(`OpenAI API request failed`, `Ticket-${ticketId}`, apiErr);
-      throw new Error(`OpenAI API error: ${errorMsg}`);
+      logger.error(`${config.llmProvider.toUpperCase()} API request failed`, `Ticket-${ticketId}`, apiErr);
+      throw new Error(`${config.llmProvider.toUpperCase()} API error: ${errorMsg}`);
     }
 
     const choice = response.data?.choices?.[0];
     if (!choice) {
-      throw new Error('OpenAI returned an empty choices array.');
+      throw new Error(`${config.llmProvider.toUpperCase()} returned an empty choices array.`);
     }
 
     // Update exact token usage
@@ -143,7 +161,7 @@ export async function runAgentLoop(sessionContext) {
     messages.push(assistantMessage);
     saveHistory(ticketId, messages);
 
-    // If model returned text content (unusual since system prompt commands exclusive tool calls, but possible)
+    // If model returned text content
     if (assistantMessage.content) {
       logger.debug(`Assistant content: "${assistantMessage.content.slice(0, 100)}..."`, `Ticket-${ticketId}`);
     }
@@ -185,7 +203,7 @@ export async function runAgentLoop(sessionContext) {
           logger.info(`Idle tool execution validated. Exiting agent loop.`, `Ticket-${ticketId}`);
           loopActive = false;
           
-          // Determine final status based on routing destination (if routed to escalate, mark ticket status as escalated)
+          // Determine final status based on routing destination
           if (sessionContext.flags.wasRouted && sessionContext.routingDestination === 'escalate') {
             exitStatus = 'escalated';
           }

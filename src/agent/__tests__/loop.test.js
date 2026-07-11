@@ -186,4 +186,48 @@ describe('Agent ReAct Loop', () => {
     );
     expect(hasDangling).toBe(false);
   });
+
+  it('should support llamacpp provider and request the correct endpoint without requiring openaiApiKey', async () => {
+    config.llmProvider = 'llamacpp';
+    config.llamacppUrl = 'http://localhost:9999';
+    config.llamacppModel = 'local-llama-3';
+    config.openaiApiKey = ''; // Clear api key
+
+    axios.post.mockResolvedValueOnce({
+      data: {
+        choices: [{
+          message: {
+            role: 'assistant',
+            tool_calls: [{
+              id: 'call_1',
+              type: 'function',
+              function: { name: 'idle', arguments: '{}' }
+            }]
+          }
+        }],
+        usage: { total_tokens: 80 }
+      }
+    });
+
+    executeTool.mockResolvedValueOnce('# Agent idling\n\nAll tasks completed.');
+
+    const result = await runAgentLoop(sessionContext);
+
+    expect(result.status).toBe('completed');
+    expect(axios.post).toHaveBeenCalledWith(
+      'http://localhost:9999/v1/chat/completions',
+      expect.objectContaining({
+        model: 'local-llama-3',
+        tool_choice: 'auto'
+      }),
+      expect.objectContaining({
+        timeout: 120000 // llamacpp timeout
+      })
+    );
+
+    // Restore config values
+    config.llmProvider = 'openai';
+    config.openaiApiKey = 'mock-key';
+  });
 });
+
