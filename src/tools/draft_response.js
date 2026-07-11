@@ -1,4 +1,5 @@
 // src/tools/draft_response.js
+import { updateTicketDraft } from '../database/sqlite.js';
 
 export const schema = {
   type: 'function',
@@ -19,5 +20,16 @@ export const schema = {
 };
 
 export async function handler(args, sessionContext) {
-  return 'Ticket draft response stub';
+  const { ticketId } = sessionContext;
+  const responseText = String(args?.response || '').trim();
+  if (!responseText) {
+    return 'A drafted response is required.';
+  }
+
+  try {
+    updateTicketDraft(ticketId, responseText);
+    return `Draft response saved successfully for ticket "${ticketId}".`;
+  } catch (error) {
+    return `Failed to save draft response: ${error.message}`;
+  }
 }

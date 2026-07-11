@@ -97,6 +97,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const fullMessages = [initialMsg, ...conversationList];
+    if (ticket.draft_response && ticket.status !== 'pending' && ticket.status !== 'running') {
+      fullMessages.push({
+        sender: 'agent',
+        timestamp: ticket.updated_at || ticket.created_at || new Date().toISOString(),
+        message: ticket.draft_response
+      });
+    }
 
     fullMessages.forEach(msg => {
       const isAgent = msg.sender !== 'player';
