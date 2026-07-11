@@ -10,41 +10,51 @@ describe('incident tools', () => {
   beforeEach(() => {
     const db = initDb();
     db.prepare('DELETE FROM incident').run();
-    db.prepare(`
+    const insert = db.prepare(`
       INSERT INTO incident (id, title, summary, category, severity, keywords, region, platform)
-      VALUES
-        ('INC-001', 'Login outage', 'Players cannot sign in', 'authentication', 'critical', 'login, sign-in', 'NA', 'PC'),
-        ('INC-002', 'Store delay', 'Purchases arrive late', 'payment', 'medium', 'store, purchase', 'EU', 'Mobile')
-    `).run();
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const incidents = [
+      ['INC-001', 'Players Unable to Log In', 'Players receive an authentication error when attempting to log in during peak hours.', 'Authentication', 'critical', 'login, authentication, error, account access', 'Southeast Asia', 'PC'],
+      ['INC-002', 'Missing Purchased Items', 'Some players completed purchases but the purchased items did not appear in their inventory.', 'Payment', 'high', 'purchase, payment, missing item, inventory', 'Global', 'Mobile'],
+      ['INC-003', 'High Matchmaking Latency', 'Players experience long matchmaking times and increased latency when joining ranked matches.', 'Performance', 'medium', 'matchmaking, latency, lag, ranked match', 'Asia', 'PC'],
+      ['INC-004', 'Game Crashes After Latest Update', 'The game crashes on startup for some Android devices after installing the latest update.', 'Crash', 'high', 'crash, startup, update, android', 'Global', 'Android'],
+      ['INC-005', 'Incorrect Ranked Rewards', 'Some players received rewards for the wrong rank after the competitive season ended.', 'Rewards', 'medium', 'ranked, rewards, season, incorrect reward', 'Europe', 'PC']
+    ];
+
+    const insertMany = db.transaction((rows) => {
+      for (const incident of rows) insert.run(...incident);
+    });
+    insertMany(incidents);
   });
 
-  it('searches all incident fields case-insensitively', async () => {
-    const bySummary = JSON.parse(await searchIncidents({ query: 'SIGN IN' }, {}));
-    const byPlatform = JSON.parse(await searchIncidents({ query: 'mobile' }, {}));
-
-    expect(bySummary.incidents).toEqual([
-      expect.objectContaining({ id: 'INC-001', summary: 'Players cannot sign in' })
-    ]);
-    expect(byPlatform.incidents).toEqual([
-      expect.objectContaining({ id: 'INC-002', platform: 'Mobile' })
-    ]);
+  it.each([
+    ['login authentication error', 'INC-001'],
+    ['payment missing inventory', 'INC-002'],
+    ['matchmaking lag', 'INC-003'],
+    ['android crash update', 'INC-004'],
+    ['wrong ranked rewards', 'INC-005']
+  ])('ranks the relevant incident first for "%s"', async (query, expectedId) => {
+    const result = JSON.parse(await searchIncidents({ query }, {}));
+    expect(result.incidents[0].id).toBe(expectedId);
   });
 
   it('returns an empty list when no incidents match', async () => {
-    const result = JSON.parse(await searchIncidents({ query: 'matchmaking' }, {}));
+    const result = JSON.parse(await searchIncidents({ query: 'voice chat' }, {}));
     expect(result).toEqual({ incidents: [] });
   });
 
   it('gets full incident details by ID', async () => {
-    const result = JSON.parse(await getIncidentDetails({ incident_id: 'INC-001' }, {}));
+    const result = JSON.parse(await getIncidentDetails({ incident_id: 'inc-001' }, {}));
     expect(result.incident).toEqual({
       id: 'INC-001',
-      title: 'Login outage',
-      summary: 'Players cannot sign in',
-      category: 'authentication',
+      title: 'Players Unable to Log In',
+      summary: 'Players receive an authentication error when attempting to log in during peak hours.',
+      category: 'Authentication',
       severity: 'critical',
-      keywords: 'login, sign-in',
-      region: 'NA',
+      keywords: 'login, authentication, error, account access',
+      region: 'Southeast Asia',
       platform: 'PC'
     });
   });
