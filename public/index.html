@@ -3,257 +3,96 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Compass Game Support Agent Portal</title>
-  <!-- Google Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
-  <!-- CSS Stylesheet -->
-  <link rel="stylesheet" href="css/styles.css">
+  <title>Compass — Game Support Agent</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <style>
+    .hero {
+      text-align: center;
+      padding: 80px 16px 60px;
+      border-bottom: 1px solid var(--color-border);
+    }
+    .hero h1 {
+      font-size: 36px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .hero p {
+      font-size: 16px;
+      color: var(--color-text-secondary);
+      max-width: 520px;
+      margin: 0 auto 24px;
+    }
+    .hero-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+    .hero-actions .btn {
+      padding: 10px 24px;
+      font-size: 15px;
+    }
+    .features {
+      max-width: 800px;
+      margin: 48px auto;
+      padding: 0 16px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .feature-card {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+    }
+    .feature-card h3 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .feature-card p {
+      font-size: 13px;
+      color: var(--color-text-secondary);
+      line-height: 1.5;
+    }
+  </style>
 </head>
 <body>
-  <!-- Background Glows -->
-  <div class="glow-bg glow-1"></div>
-  <div class="glow-bg glow-2"></div>
-
-  <header class="app-header">
-    <div class="header-container">
-      <div class="logo-area">
-        <div class="logo-icon">
-          <i data-lucide="compass" class="logo-spin"></i>
-        </div>
-        <div class="logo-text">
-          <h1>Compass</h1>
-          <span>AI Game Support Agent</span>
-        </div>
-      </div>
-      <div class="header-status">
-        <span class="status-indicator online"></span>
-        <span class="status-label">System Active</span>
-      </div>
+  <header class="header">
+    <div class="header-left">
+      <a href="/" class="header-logo">⊙ Compass</a>
+      <nav class="header-nav">
+        <a href="/submit.html">Submit Ticket</a>
+        <a href="/dashboard.html">Dashboard</a>
+      </nav>
     </div>
   </header>
 
-  <main class="main-container">
-    <!-- Dashboard Tab Switcher -->
-    <div class="tab-container glass">
-      <button class="tab-btn active" data-tab="queue-tab">
-        <i data-lucide="list-todo"></i>
-        <span>Ticket Queue</span>
-      </button>
-      <button class="tab-btn" data-tab="history-tab">
-        <i data-lucide="history"></i>
-        <span>Agent Run History</span>
-      </button>
+  <section class="hero">
+    <h1>⊙ Compass</h1>
+    <p>AI-powered game support agent. Automatically triages, classifies, and resolves player tickets using a ReAct loop with tool-calling.</p>
+    <div class="hero-actions">
+      <a href="/submit.html" class="btn btn-primary">Submit a Ticket</a>
+      <a href="/dashboard.html" class="btn">Open Dashboard</a>
     </div>
+  </section>
 
-    <!-- Tab 1: Ticket Queue View -->
-    <div id="queue-tab" class="tab-content active">
-      <div class="grid-layout">
-        
-        <!-- Column 1: Submit Ticket Form -->
-        <section class="form-section card glass">
-          <div class="card-header">
-            <i data-lucide="plus-circle" class="header-icon"></i>
-            <h2>Submit Support Ticket</h2>
-            <p>Simulate a player filing a support request</p>
-          </div>
-          
-          <form id="ticket-form" class="ticket-form">
-            <div class="form-row">
-              <div class="form-group">
-                <label for="ticket-id">Ticket ID</label>
-                <div class="input-wrapper">
-                  <i data-lucide="hash" class="input-icon"></i>
-                  <input type="text" id="ticket-id" required placeholder="T-1001">
-                </div>
-              </div>
-              <div class="form-group">
-                <label for="locale">Player Locale</label>
-                <div class="input-wrapper">
-                  <i data-lucide="languages" class="input-icon"></i>
-                  <select id="locale">
-                    <option value="en-US">en-US (English)</option>
-                    <option value="vi-VN">vi-VN (Vietnamese)</option>
-                    <option value="zh-CN">zh-CN (Chinese)</option>
-                    <option value="es-ES">es-ES (Spanish)</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label for="subject">Subject</label>
-              <div class="input-wrapper">
-                <i data-lucide="tag" class="input-icon"></i>
-                <input type="text" id="subject" required placeholder="e.g. Premium pass charged twice">
-              </div>
-            </div>
-
-            <div class="form-row">
-              <div class="form-group">
-                <label for="player-id">Player ID</label>
-                <div class="input-wrapper">
-                  <i data-lucide="user" class="input-icon"></i>
-                  <input type="text" id="player-id" placeholder="player_4821">
-                </div>
-              </div>
-              <div class="form-group">
-                <label for="account-id">Game Account ID</label>
-                <div class="input-wrapper">
-                  <i data-lucide="shield" class="input-icon"></i>
-                  <input type="text" id="account-id" placeholder="account_9917">
-                </div>
-              </div>
-            </div>
-
-            <div class="form-row">
-              <div class="form-group">
-                <label for="platform">Platform</label>
-                <div class="input-wrapper">
-                  <i data-lucide="smartphone" class="input-icon"></i>
-                  <select id="platform">
-                    <option value="Android">Android</option>
-                    <option value="iOS">iOS</option>
-                    <option value="PC">PC</option>
-                  </select>
-                </div>
-              </div>
-              <div class="form-group">
-                <label for="region">Region</label>
-                <div class="input-wrapper">
-                  <i data-lucide="globe" class="input-icon"></i>
-                  <select id="region">
-                    <option value="SEA">SEA (Southeast Asia)</option>
-                    <option value="NA">NA (North America)</option>
-                    <option value="EU">EU (Europe)</option>
-                    <option value="Global">Global</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label for="description">Issue Description (Gaming slang supported)</label>
-              <textarea id="description" rows="4" required placeholder="Describe what happened... e.g. I got double billed for battle pass and the game is lagging, massive gap diff."></textarea>
-            </div>
-
-            <!-- Collapsible Billing Details -->
-            <details class="billing-details-summary">
-              <summary><i data-lucide="credit-card"></i> Add Transaction Details (Optional)</summary>
-              <div class="billing-content form-card">
-                <div class="form-row">
-                  <div class="form-group">
-                    <label for="transaction-id">Transaction ID</label>
-                    <input type="text" id="transaction-id" placeholder="TXN-883102">
-                  </div>
-                  <div class="form-group">
-                    <label for="product">Product / Item</label>
-                    <input type="text" id="product" placeholder="Premium Battle Pass">
-                  </div>
-                </div>
-                <div class="form-group">
-                  <label for="amount">Charged Amount</label>
-                  <input type="text" id="amount" placeholder="249,000 VND">
-                </div>
-              </div>
-            </details>
-
-            <button type="submit" class="btn-primary">
-              <span>Queue Ticket for AI Processing</span>
-              <i data-lucide="send"></i>
-            </button>
-          </form>
-        </section>
-
-        <!-- Column 2: Dashboard Monitor -->
-        <section class="dashboard-section">
-          <div class="section-header card-header-inline">
-            <div class="header-text-block">
-              <i data-lucide="list-todo" class="header-icon text-cyan"></i>
-              <h2>Live Ticket Queue</h2>
-              <p>Active routing and deflection pipeline</p>
-            </div>
-            <button id="refresh-btn" class="btn-icon" title="Refresh Queue">
-              <i data-lucide="refresh-cw"></i>
-            </button>
-          </div>
-
-          <div id="tickets-container" class="tickets-container">
-            <!-- Tickets will be dynamically rendered here -->
-            <div class="empty-state">
-              <i data-lucide="inbox"></i>
-              <p>No tickets in the queue. Use the form on the left to submit a ticket!</p>
-            </div>
-          </div>
-        </section>
-
-      </div>
+  <div class="features">
+    <div class="feature-card">
+      <h3>Ticket Queue</h3>
+      <p>Submit support tickets through the portal. They enter a SQLite queue and are automatically picked up by the worker pool.</p>
     </div>
-
-    <!-- Tab 2: Agent Run History View -->
-    <div id="history-tab" class="tab-content">
-      <div class="history-split-layout">
-        <!-- Sidebar: List of runs -->
-        <aside class="history-sidebar glass">
-          <div class="sidebar-header">
-            <h3>Processed Runs</h3>
-            <p>Select a run to view prompt trace</p>
-          </div>
-          <div id="history-runs-list" class="history-runs-list">
-            <!-- Run items will be dynamically loaded here -->
-            <p class="empty-sidebar">No agent runs available.</p>
-          </div>
-        </aside>
-
-        <!-- Main Viewer: Timeline chat log -->
-        <section class="history-viewer glass">
-          <div id="viewer-header" class="viewer-header">
-            <div class="viewer-title-block">
-              <i data-lucide="bot" class="viewer-title-icon"></i>
-              <div>
-                <h3 id="viewer-title">No Run Selected</h3>
-                <p id="viewer-subtitle">Select an agent execution trace from the sidebar to audit the conversation log</p>
-              </div>
-            </div>
-          </div>
-          
-          <div id="viewer-body" class="viewer-body">
-            <div class="empty-state" style="padding-top: 10rem;">
-              <i data-lucide="scroll-text"></i>
-              <p>Select a processed run from the sidebar to inspect the model's ReAct decisions and prompts.</p>
-            </div>
-          </div>
-        </section>
-      </div>
+    <div class="feature-card">
+      <h3>ReAct Agent Loop</h3>
+      <p>Each ticket is processed by an LLM agent that reads, classifies, searches knowledge bases, drafts responses, and routes.</p>
     </div>
-
-  </main>
-
-  <!-- History Modal / Drawer (Overlay for quick view) -->
-  <div id="history-modal" class="modal-overlay">
-    <div class="modal-content glass">
-      <div class="modal-header">
-        <div class="modal-title-area">
-          <i data-lucide="scroll-text" class="modal-header-icon"></i>
-          <div>
-            <h3 id="modal-ticket-id">Ticket T-1001 Logs</h3>
-            <p>AI Agent ReAct Loop Trace</p>
-          </div>
-        </div>
-        <button id="close-modal-btn" class="btn-close">
-          <i data-lucide="x"></i>
-        </button>
-      </div>
-      <div id="modal-body" class="modal-body">
-        <!-- ReAct steps will be rendered here -->
-      </div>
+    <div class="feature-card">
+      <h3>Dynamic Checklist</h3>
+      <p>Validation adapts to the resolution type — resolved, escalated, needs_clarification, or rejected — enforcing the right steps.</p>
+    </div>
+    <div class="feature-card">
+      <h3>Live Dashboard</h3>
+      <p>Monitor the management layer, active agents, and full conversation history traces in real time with 3-second polling.</p>
     </div>
   </div>
-
-  <!-- JavaScript App Logic -->
-  <script src="js/app.js"></script>
 </body>
 </html>
