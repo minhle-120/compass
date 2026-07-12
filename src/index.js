@@ -9,7 +9,9 @@ import { logger } from './utils/logger.js';
 import { isValidTicketId } from './utils/ticketId.js';
 import { normalizeAttachments, normalizeTicketSubmission } from './utils/ticketSubmission.js';
 import { presentTicket } from './utils/ticketPresentation.js';
+import { buildDemoIncidentTickets, getDemoIncidentScenario } from './utils/demoIncident.js';
 import { initDb, resetInterruptedTickets, getTicket, insertTicket, getDb, getQueueStats, appendTicketMessage, publishDraftResponse, closeTicketByUser, getIncidentTicketSummary } from './database/sqlite.js';
+import { handler as classifyTicket } from './tools/classify_ticket.js';
 import { deleteResolvedTicket, TicketDeletionError } from './services/ticketDeletion.js';
 import { pool } from './worker/pool.js';
 import { listUnresolvedIncidents } from '../services/incident/incidentService.js';
@@ -66,6 +68,10 @@ app.get('/slang', (req, res) => {
 
 app.get('/flags', (req, res) => {
   res.sendFile(join(__dirname, '../public/flags.html'));
+});
+
+app.get('/demo', (req, res) => {
+  res.sendFile(join(__dirname, '../public/demo.html'));
 });
 
 app.get('/api/wiki', (req, res) => {
@@ -436,6 +442,73 @@ app.post('/api/tickets', (req, res) => {
     }
     logger.error('Failed to insert and queue new ticket', 'ExpressAPI', err);
     res.status(500).json({ error: 'Failed to queue ticket' });
+  }
+});
+
+// Hackathon demo: create and cluster one realistic five-ticket incident burst.
+app.post('/api/demo/spawn-incident', async (req, res) => {
+  const createdAt = new Date().toISOString();
+  const database = getDb();
+  const previousBatchCount = database.prepare(`
+    SELECT COUNT(DISTINCT created_at) AS count
+    FROM tickets
+    WHERE id LIKE 'T-DEMO-%'
+  `).get().count;
+  const scenario = getDemoIncidentScenario(previousBatchCount);
+  const tickets = buildDemoIncidentTickets({ createdAt, scenario });
+  let incident = null;
+
+  try {
+    // Keep the batch unavailable to workers until every report has been inserted
+    // and evaluated, so all five share one exact incident-detection window.
+    for (const ticket of tickets) insertTicket(ticket);
+
+    for (const ticket of tickets) {
+      const classification = JSON.parse(await classifyTicket(
+        scenario.classification,
+        { ticketId: ticket.id }
+      ));
+      if (classification.incident?.incident) {
+        incident = classification.incident.incident;
+      }
+    }
+
+    const releaseTickets = database.prepare(`
+      UPDATE tickets
+      SET status = 'pending', updated_at = ?
+      WHERE id = ? AND status = 'running'
+    `);
+    const releaseBatch = database.transaction(() => {
+      for (const ticket of tickets) releaseTickets.run(createdAt, ticket.id);
+    });
+    releaseBatch();
+
+    pool.checkQueue();
+    logger.info(`Created demo incident batch with ${tickets.length} tickets`, 'DemoAPI');
+    return res.status(201).json({
+      message: 'Five-ticket incident demo created successfully',
+      createdAt,
+      ticketIds: tickets.map((ticket) => ticket.id),
+      tickets: tickets.map((ticket) => ({ id: ticket.id, subject: ticket.subject })),
+      scenario: { key: scenario.key, name: scenario.name },
+      incident: incident ? {
+        id: incident.id,
+        title: incident.title,
+        severity: incident.severity,
+        status: incident.status
+      } : null
+    });
+  } catch (err) {
+    // A failed demo batch must not remain disguised as active worker jobs.
+    const database = getDb();
+    const releaseTicket = database.prepare(`
+      UPDATE tickets SET status = 'pending', updated_at = ?
+      WHERE id = ? AND status = 'running'
+    `);
+    for (const ticket of tickets) releaseTicket.run(new Date().toISOString(), ticket.id);
+    pool.checkQueue();
+    logger.error('Failed to create demo incident batch', 'DemoAPI', err);
+    return res.status(500).json({ error: 'Failed to create the incident demo batch' });
   }
 });
 

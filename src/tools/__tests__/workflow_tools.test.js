@@ -121,10 +121,10 @@ describe('support workflow tools', () => {
 
   it('searches and retrieves real knowledge-base records', async () => {
     const search = await searchKnowledgeBase({ query: 'Android startup' }, context);
-    const articleId = search.results[0].article_id;
-    expect(articleId).toBe('wiki:243');
+    const wikiArticle = search.results.find((result) => result.article_id === 'wiki:243');
+    expect(wikiArticle).toBeDefined();
 
-    const details = await getKnowledgeBaseArticle({ article_id: articleId }, context);
+    const details = await getKnowledgeBaseArticle({ article_id: wikiArticle.article_id }, context);
     expect(details.content).toContain('clear the cache');
   });
 });

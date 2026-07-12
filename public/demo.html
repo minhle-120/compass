@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Incident Demo — Compass</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <script src="/js/theme.js"></script>
+</head>
+<body>
+  <header class="header">
+    <div class="header-left">
+      <a href="/" class="header-logo">Compass</a>
+      <nav class="header-nav">
+        <a href="/submit.html">Submit Ticket</a>
+        <a href="/tickets.html">Browse Tickets</a>
+        <a href="/dashboard.html">Dashboard</a>
+        <a href="/demo" class="active">Incident Demo</a>
+      </nav>
+    </div>
+    <div class="header-right">
+      <button id="theme-toggle" class="btn btn-sm" aria-label="Toggle theme" style="padding: 4px 8px; line-height: 1;">
+        <span class="theme-toggle-icon" aria-hidden="true">☾</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="container" style="max-width: 820px;">
+    <div class="page-heading">
+      <div>
+        <h1>Hidden Incident Demo</h1>
+        <p class="subtitle" style="color: var(--color-fg-muted); margin-top: 4px;">
+          Generate a realistic burst of related player reports and watch Compass group them into an incident.
+        </p>
+      </div>
+    </div>
+
+    <div id="demo-flash" class="flash" role="status" aria-live="polite"></div>
+
+    <section class="box mb-4">
+      <div class="box-header">One-click scenario</div>
+      <div class="box-body">
+        <p style="margin-top: 0;">
+          Each click selects the next problem scenario and creates five differently worded reports with the exact
+          same creation timestamp. The reports are clustered and then released to the normal support queue.
+        </p>
+        <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
+          <button id="spawn-demo" class="btn btn-primary" type="button">Create next problem and incident</button>
+          <a class="btn" href="/dashboard.html">Open live dashboard</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="box">
+      <div class="box-header">Problems rotated by the demo</div>
+      <div class="box-body">
+        <ol style="margin: 0; padding-left: 22px; display: grid; gap: 8px;">
+          <li>PS5 gameplay black screen</li>
+          <li>Xbox voice chat disconnection</li>
+          <li>Frozen payment receipt</li>
+          <li>Vanguard restart loop</li>
+        </ol>
+        <p class="text-muted" style="margin-bottom: 0;">After the fourth scenario, the rotation starts again.</p>
+      </div>
+    </section>
+
+    <section id="demo-result" class="box mt-4" style="display: none;">
+      <div class="box-header">Created successfully</div>
+      <div class="box-body" id="demo-result-body"></div>
+    </section>
+  </main>
+
+  <script src="/js/demo.js"></script>
+</body>
+</html>
